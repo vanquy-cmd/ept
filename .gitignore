@@ -1,0 +1,45 @@
+# Ignore env files
+########################################
+# ENVIRONMENT FILES (SECRETS)
+########################################
+backend/.env
+frontend/.env
+.env
+
+########################################
+# NODE / BUILD ARTIFACTS
+########################################
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+dist/
+build/
+backend/dist/
+backend/build/
+frontend/dist/
+frontend/build/
+
+########################################
+# LOGS / TEMP
+########################################
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+.DS_Store
+Thumbs.db
+
+########################################
+# EDITOR / OS FILES
+########################################
+.vscode/
+.idea/
+*.iml
+
+########################################
+# OPTIONAL: DATABASE DUMPS
+########################################
+*.sql
+*.sqlite
