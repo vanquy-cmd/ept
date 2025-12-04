@@ -1,16 +1,28 @@
 # React + TypeScript + Vite
 frontend/
+
 ├── src/
+
 │   ├── assets/         (Hình ảnh, fonts...)
+
 │   ├── components/     (Các component tái sử dụng: Button, Loading, ProtectedRoute...)
+
 │   ├── contexts/       (Nơi chứa AuthContext)
+
 │   ├── hooks/          (Các custom hook: useAuth, useApi...)
+
 │   ├── pages/          (Các trang chính: Login, Register, Dashboard, Admin...)
+
 │   ├── services/       (Nơi cấu hình Axios, gọi API)
+
 │   ├── styles/         (CSS, SCSS...)
+
 │   ├── utils/          (Các hàm tiện ích)
+
 │   ├── App.tsx         (File App chính)
+
 │   └── main.tsx        (File render gốc)
+
 └── .env
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
