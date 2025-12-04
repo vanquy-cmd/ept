@@ -1,6 +1,7 @@
 Node.js + Express.js (để tạo máy chủ và API) và MySQL Workbench 8.0 CE(làm cơ sở dữ liệu).
 
 ept_backend/
+
 ├── node_modules/       (Thư viện đã cài)
 ├── src/                (Nơi chứa mã nguồn chính)
 │   ├── config/         (Cấu hình)
