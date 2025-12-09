@@ -13,6 +13,7 @@ import {
     findUserByResetToken,     // <-- Import mới
     resetUserPassword
 } from '../models/userModel.js';
+import { sendPasswordResetEmail } from '../utils/emailService.js';
 
 /**
  * Hàm xử lý Đăng ký (Register)
@@ -169,13 +170,13 @@ export const handleForgotPassword = asyncHandler(async (req, res) => {
     // 4. Lưu token vào CSDL
     await savePasswordResetToken(user.id, resetToken, expires);
 
-    // 5. Gửi email (Hiện tại chúng ta sẽ MÔ PHỎNG)
-    // Trong một ứng dụng thực tế, bạn sẽ dùng 'nodemailer' để gửi email
-    const resetURL = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password/${resetToken}`;
-    
-    console.log('--- LINK ĐẶT LẠI MẬT KHẨU (MÔ PHỎNG GỬI EMAIL) ---');
-    console.log(resetURL);
-    console.log('----------------------------------------------------');
+    // 5. Gửi email đặt lại mật khẩu
+    try {
+        await sendPasswordResetEmail(email, resetToken, user.full_name);
+    } catch (error) {
+        // Log lỗi nhưng vẫn trả về thành công để không lộ thông tin
+        console.error('Lỗi khi gửi email đặt lại mật khẩu:', error);
+    }
 
     res.status(200).json({ message: 'Nếu email của bạn tồn tại trong hệ thống, bạn sẽ nhận được một liên kết đặt lại mật khẩu.' });
 });

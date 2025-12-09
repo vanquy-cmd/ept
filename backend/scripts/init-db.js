@@ -13,6 +13,10 @@ const __dirname = path.dirname(__filename);
 /**
  * Script tự động chạy migrations để tạo database tables
  * Chạy lệnh: npm run init-db
+ * 
+ * Nếu đã có dữ liệu và muốn bỏ qua khởi tạo lại:
+ *   - đặt SKIP_INIT_IF_EXISTS=true trong .env
+ *   - script sẽ kiểm tra table vocabulary_translation_history; nếu có sẽ bỏ qua toàn bộ migrations
  */
 async function initDatabase() {
   console.log('🔄 Đang khởi tạo database...\n');
@@ -23,11 +27,27 @@ async function initDatabase() {
     process.exit(1);
   }
 
+  const skipIfExists = process.env.SKIP_INIT_IF_EXISTS === 'true';
+
   let connection;
   try {
     // Kết nối database
     connection = await mysql.createConnection(process.env.DATABASE_URL);
     console.log('✅ Đã kết nối database thành công\n');
+
+    // Nếu người dùng muốn bỏ qua khi đã có bảng
+    if (skipIfExists) {
+      const [rows] = await connection.query(
+        `SELECT COUNT(*) as cnt
+         FROM information_schema.tables
+         WHERE table_schema = DATABASE() 
+           AND table_name = 'vocabulary_translation_history'`
+      );
+      if (rows?.[0]?.cnt > 0) {
+        console.log('ℹ️  Phát hiện bảng đã tồn tại và SKIP_INIT_IF_EXISTS=true → Bỏ qua migrations.\n');
+        return;
+      }
+    }
 
     // Danh sách migrations theo thứ tự
     const migrations = [
