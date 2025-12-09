@@ -123,3 +123,25 @@ Xem file backend/AWS_IAM_FIX.md để biết cách sửa.`;
     throw error;
   }
 };
+
+/**
+ * Upload một buffer bất kỳ lên S3.
+ * Dùng khi server tự tải dữ liệu (ví dụ: audio từ API bên thứ 3) và muốn lưu lại.
+ * @param {Buffer} buffer - Dữ liệu cần upload
+ * @param {string} key - Đường dẫn lưu trên S3
+ * @param {string} contentType - MIME type của file
+ * @returns {Promise<{ key: string, publicUrl: string }>}
+ */
+export const uploadBufferToS3 = async (buffer, key, contentType = 'application/octet-stream') => {
+  const command = new PutObjectCommand({
+    Bucket: bucketName,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+  });
+
+  await s3Client.send(command);
+
+  const publicUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${key}`;
+  return { key, publicUrl };
+};

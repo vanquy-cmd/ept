@@ -5,6 +5,7 @@ import {
   handleGetWordsBySetId,
   handleTranslateVocabulary,
   handleGetTranslationHistory,
+  handleFetchDictionaryAudio,
   // Hàm cho Admin
   handleGetSetDetails,
   handleCreateSet,
@@ -22,6 +23,10 @@ const router = express.Router();
 // Dịch từ/cụm từ tiếng Việt sang tiếng Anh
 // QUAN TRỌNG: Đặt route này TRƯỚC các route có tham số động để tránh conflict
 router.post('/translate', protect, handleTranslateVocabulary);
+
+// POST /api/vocabulary/audio
+// Lấy audio từ Free Dictionary và lưu lên S3
+router.post('/audio', protect, handleFetchDictionaryAudio);
 
 // GET /api/vocabulary/history
 // Lấy lịch sử tra từ điển của user
