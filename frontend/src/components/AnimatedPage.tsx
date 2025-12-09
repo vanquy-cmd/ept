@@ -1,12 +1,14 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
-// Định nghĩa các hiệu ứng
-// Chúng ta sẽ dùng hiệu ứng "opacity" (độ mờ) và "y" (trượt nhẹ từ dưới lên)
+// Cho phép tắt animation nếu cần mượt tuyệt đối
+const ENABLE_ANIMATION = false;
+
+// Định nghĩa hiệu ứng nhẹ nhàng chỉ dùng opacity để tránh giật/nhảy layout
 const animations = {
-  initial: { opacity: 0, y: 20 }, // Trạng thái ban đầu: mờ, ở dưới 20px
-  animate: { opacity: 1, y: 0 },  // Trạng thái khi xuất hiện: rõ, ở vị trí 0
-  exit:    { opacity: 0, y: -20 }, // Trạng thái khi thoát: mờ, trượt lên -20px
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit:    { opacity: 0 },
 };
 
 interface AnimatedPageProps {
@@ -14,13 +16,18 @@ interface AnimatedPageProps {
 }
 
 const AnimatedPage: React.FC<AnimatedPageProps> = ({ children }) => {
+  if (!ENABLE_ANIMATION) {
+    // Trả về nội dung thẳng, không animation
+    return <>{children}</>;
+  }
+
   return (
     <motion.div
       variants={animations}      // Áp dụng các hiệu ứng đã định nghĩa
       initial="initial"         // Trạng thái bắt đầu
       animate="animate"         // Trạng thái kết thúc
       exit="exit"               // Trạng thái khi rời đi
-      transition={{ duration: 0.3 }} // Thời gian chuyển động (0.3 giây)
+      transition={{ duration: 0.18, ease: 'easeOut' }} // Nhẹ hơn, đỡ giật
     >
       {children}
     </motion.div>

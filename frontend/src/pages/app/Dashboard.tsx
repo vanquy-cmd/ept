@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
-import type { DashboardData } from '../../types';
+import type { DashboardData, RecentActivity } from '../../types';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   Box, 
@@ -30,7 +30,9 @@ import DiligenceChart from '../../components/DiligenceChart';
 const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
+  const [history, setHistory] = useState<RecentActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const theme = useTheme();
 
@@ -38,13 +40,24 @@ const DashboardPage: React.FC = () => {
     const fetchDashboardData = async () => {
       try {
         setIsLoading(true);
+        setIsHistoryLoading(true);
         setError(null);
-        const response = await api.get<DashboardData>('/api/dashboard');
-        setData(response.data);
+        // Lấy full lịch sử để biểu đồ chăm chỉ có đủ dữ liệu
+        const [dashboardResp, historyResp] = await Promise.all([
+          api.get<DashboardData>('/api/dashboard', {
+            params: { limit: 'all' }
+          }),
+          api.get<RecentActivity[]>('/api/history/attempts', {
+            params: { limit: 'all' }
+          })
+        ]);
+        setData(dashboardResp.data);
+        setHistory(historyResp.data);
       } catch (err: any) {
         setError(err.response?.data?.message || 'Không thể tải dữ liệu dashboard.');
       } finally {
         setIsLoading(false);
+        setIsHistoryLoading(false);
       }
     };
 
@@ -231,7 +244,7 @@ const DashboardPage: React.FC = () => {
               <Typography variant="h6" fontWeight="600">Hoạt động gần đây</Typography>
               <Button 
                 component={RouterLink} 
-                to="/history" 
+                to="/history?limit=all" 
                 size="small" 
                 color="primary"
               >
@@ -315,7 +328,10 @@ const DashboardPage: React.FC = () => {
 
           {/* Cột bên phải - Biểu đồ chăm chỉ và truy cập nhanh */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <DiligenceChart />
+            <DiligenceChart 
+              activities={history.length ? history : data.recent_activity} 
+              loading={isLoading || isHistoryLoading}
+            />
             
             <Paper 
               elevation={0}

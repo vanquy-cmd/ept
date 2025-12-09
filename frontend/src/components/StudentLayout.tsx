@@ -19,14 +19,16 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import SchoolIcon from '@mui/icons-material/School';
 import QuizIcon from '@mui/icons-material/Quiz';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import HomeIcon from '@mui/icons-material/Home';
 // ------------------------------
 
 // Cập nhật navItems để chứa icons
 const navItems = [
-  { text: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
+  { text: 'Trang chủ', path: '/', icon: <HomeIcon /> },
   { text: 'Học tập', path: '/learning', icon: <SchoolIcon /> },
   { text: 'Luyện tập', path: '/practice', icon: <QuizIcon /> },
   { text: 'Từ vựng', path: '/vocabulary', icon: <MenuBookIcon /> },
+  { text: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> }
 ];
 const drawerWidth = 240;
 
@@ -58,18 +60,24 @@ const StudentLayout: React.FC = () => {
       </Typography>
       <Divider />
       <List>
-        {navItems.map((item) => (
-          <ListItem key={item.text} disablePadding>
-            <ListItemButton
-              component={RouterLink}
-              to={item.path}
-              selected={location.pathname.startsWith(item.path)}
-            >
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
-          </ListItem>
-        ))}
+        {navItems.map((item) => {
+          const isHome = item.path === '/';
+          const isActive = isHome
+            ? location.pathname === '/'
+            : location.pathname.startsWith(item.path);
+          return (
+            <ListItem key={item.text} disablePadding>
+              <ListItemButton
+                component={RouterLink}
+                to={item.path}
+                selected={isActive}
+              >
+                <ListItemIcon>{item.icon}</ListItemIcon>
+                <ListItemText primary={item.text} />
+              </ListItemButton>
+            </ListItem>
+          );
+        })}
       </List>
     </Box>
   );
@@ -124,23 +132,29 @@ const StudentLayout: React.FC = () => {
                   display: { xs: 'none', md: 'flex' }, 
                   ml: 2 
               }}>
-                {navItems.map((item) => (
-                  <Button
-                    key={item.text}
-                    component={RouterLink}
-                    to={item.path}
-                    sx={{
-                      my: 2,
-                      color: 'inherit',
-                      display: 'block',
-                      fontWeight: location.pathname.startsWith(item.path) ? 700 : 400,
-                      borderBottom: location.pathname.startsWith(item.path) ? '2px solid' : 'none',
-                      borderRadius: 0,
-                    }}
-                  >
-                    {item.text}
-                  </Button>
-                ))}
+                {navItems.map((item) => {
+                  const isHome = item.path === '/';
+                  const isActive = isHome
+                    ? location.pathname === '/'
+                    : location.pathname.startsWith(item.path);
+                  return (
+                    <Button
+                      key={item.text}
+                      component={RouterLink}
+                      to={item.path}
+                      sx={{
+                        my: 2,
+                        color: 'inherit',
+                        display: 'block',
+                        fontWeight: isActive ? 700 : 400,
+                        borderBottom: isActive ? '2px solid' : 'none',
+                        borderRadius: 0,
+                      }}
+                    >
+                      {item.text}
+                    </Button>
+                  );
+                })}
               </Box>
             )}
 

@@ -1,45 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Paper, Typography, Box, Button, CircularProgress } from '@mui/material';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import type { RecentActivity } from '../types/dashboard.types';
 
-interface PracticeDay {
-  date: string;
-  practiced: boolean;
+interface DiligenceChartProps {
+  activities: RecentActivity[];
+  loading?: boolean;
 }
 
-const DiligenceChart: React.FC = () => {
+const DiligenceChart: React.FC<DiligenceChartProps> = ({ activities, loading }) => {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
-  const [practiceDays, setPracticeDays] = useState<PracticeDay[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
+  const practicedDates = useMemo(() => {
+    // Lấy danh sách ngày có hoạt động (yyyy-MM-dd)
+    return new Set(
+      activities.map((item) => format(new Date(item.start_time), 'yyyy-MM-dd'))
+    );
+  }, [activities]);
+
+  // Khi có dữ liệu, tự động nhảy tới tháng mới nhất có hoạt động
   useEffect(() => {
-    const loadPracticeData = () => {
-      try {
-        setIsLoading(true);
-        
-        // Danh sách các ngày đã luyện tập (theo định dạng yyyy-MM-dd)
-        const practicedDates = [
-          '2025-11-23', // Ngày 23/11
-          '2025-12-01'  // Ngày 1/12
-        ];
-        
-        // Tạo mảng practiceDays từ danh sách các ngày đã luyện tập
-        const practiceData: PracticeDay[] = practicedDates.map(date => ({
-          date,
-          practiced: true
-        }));
-        
-        setPracticeDays(practiceData);
-      } catch (error) {
-        console.error('Error loading practice data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadPracticeData();
-  }, [currentMonth]);
+    if (activities.length === 0) return;
+    const latest = new Date(activities[0].start_time);
+    setCurrentMonth(startOfMonth(latest));
+  }, [activities]);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -49,8 +34,6 @@ const DiligenceChart: React.FC = () => {
   
   const emptyDays = Array(startDay).fill(null);
   
-  const practicedDates = new Set(practiceDays.filter(day => day.practiced).map(day => day.date));
-
   const formatDate = (date: Date) => format(date, 'yyyy-MM-dd');
 
   const isToday = (date: Date) => isSameDay(date, new Date());
@@ -72,24 +55,23 @@ const DiligenceChart: React.FC = () => {
         boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
       }}
     >
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        mb: 3,
-        borderBottom: '1px solid',
-        borderColor: 'divider',
-        pb: 2
-      }}>
-        <Typography variant="h6" component="h2" sx={{ 
-          fontWeight: 600,
-          color: 'text.primary'
-        }}>
+      <Box sx={{ mb: 3 }}>
+        <Typography
+          variant="h6"
+          component="h2"
+          sx={{
+            fontWeight: 700,
+            color: 'text.primary',
+            textAlign: 'center',
+            mb: 2
+          }}
+        >
           Biểu đồ chăm chỉ
         </Typography>
         <Box sx={{ 
           display: 'flex', 
           alignItems: 'center',
+          justifyContent: 'space-between',
           bgcolor: 'background.paper',
           borderRadius: 2,
           p: 0.5,
@@ -160,7 +142,7 @@ const DiligenceChart: React.FC = () => {
         ))}
       </Box>
 
-      {isLoading ? (
+      {loading ? (
         <Box sx={{ 
           display: 'flex', 
           justifyContent: 'center', 

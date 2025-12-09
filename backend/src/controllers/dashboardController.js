@@ -9,17 +9,27 @@ export const handleGetDashboard = async (req, res) => {
   try {
     const userId = req.user.id; // Lấy từ middleware 'protect'
 
+    // Cho phép client yêu cầu nhiều hơn hoặc toàn bộ lịch sử
+    // - limit: số bản ghi muốn lấy (mặc định 5)
+    // - limit=all hoặc limit=-1: trả về toàn bộ
+    const { limit } = req.query;
+    const parsedLimit = typeof limit === 'string' ? limit.toLowerCase() : undefined;
+    const shouldReturnAll = parsedLimit === 'all' || parsedLimit === '-1';
+    const numericLimit = !shouldReturnAll && Number.isFinite(Number(limit)) ? Number(limit) : 5;
+
     // 1. Lấy các số liệu thống kê (chạy song song)
     const statsPromise = getDashboardStats(userId);
     
-    // 2. Lấy 5 hoạt động gần đây (chạy song song)
-    const historyPromise = getAttemptHistory(userId); // Hàm này đã sắp xếp DESC
+    // 2. Lấy lịch sử làm bài (đã sắp xếp DESC)
+    const historyPromise = getAttemptHistory(userId);
 
     // 3. Chờ cả hai hoàn thành
     const [stats, fullHistory] = await Promise.all([statsPromise, historyPromise]);
 
-    // 4. Cắt 5 bài gần nhất
-    const recent_activity = fullHistory.slice(0, 5);
+    // 4. Cắt theo limit nếu cần, hoặc trả full
+    const recent_activity = shouldReturnAll
+      ? fullHistory
+      : fullHistory.slice(0, numericLimit);
 
     // 5. Gửi phản hồi
     res.status(200).json({
