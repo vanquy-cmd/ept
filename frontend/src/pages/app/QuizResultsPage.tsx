@@ -76,6 +76,7 @@ const QuizResultsPage: React.FC = () => {
     const isIncorrect = item.is_correct === false;
     const isAIGraded = item.question_type === 'essay' || item.question_type === 'speaking';
     const isSpeaking = item.question_type === 'speaking';
+    const audioUrl = item.user_answer_signed_url || (item.user_answer_url?.startsWith('http') ? item.user_answer_url : undefined);
     
     // Style cho lựa chọn trắc nghiệm
     const getOptionStyle = (option: ResultOption) => {
@@ -100,7 +101,7 @@ const QuizResultsPage: React.FC = () => {
           {isCorrect && <CheckCircleIcon color="success" sx={{ mr: 1 }} />}
           {isIncorrect && <CancelIcon color="error" sx={{ mr: 1 }} />}
           <Typography sx={{ flexShrink: 0, fontWeight: 500 }}>
-            Câu {index + 1}: {item.question_text.substring(0, 100)}...
+            Đề bài: {item.question_text.substring(0, 100)}...
           </Typography>
         </AccordionSummary>
         
@@ -155,16 +156,13 @@ const QuizResultsPage: React.FC = () => {
                         transcript={parsed.transcript}
                         tokenMatches={parsed.tokenMatches}
                         targetSentence={item.question_text}
-                        score={item.ai_score || 0}
+                        audioUrl={audioUrl || undefined}
                       />
                     );
                   }
                   // Fallback nếu không parse được
                   return (
                     <Box>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>AI Score: {item.ai_score || 0}/100</strong>
-                      </Typography>
                       <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
                         {item.ai_feedback}
                       </Typography>

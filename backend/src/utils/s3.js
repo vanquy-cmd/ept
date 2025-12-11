@@ -145,3 +145,18 @@ export const uploadBufferToS3 = async (buffer, key, contentType = 'application/o
   const publicUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${key}`;
   return { key, publicUrl };
 };
+
+/**
+ * Tạo presigned URL để tải (GET) một object trong S3.
+ * @param {string} key - Đường dẫn file trong S3
+ * @param {number} expiresIn - Thời gian hết hạn (giây)
+ * @returns {Promise<string>}
+ */
+export const generateSignedGetUrl = async (key, expiresIn = 3600) => {
+  if (!key) throw new Error('Missing key for signed URL');
+  const command = new GetObjectCommand({
+    Bucket: bucketName,
+    Key: key
+  });
+  return getSignedUrl(s3Client, command, { expiresIn });
+};

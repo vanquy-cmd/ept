@@ -111,7 +111,18 @@ const AdminAttemptDetailPage: React.FC = () => {
 
           {isAIGraded && (
              <Box sx={{ mt: 2 }}>
-                {item.user_answer_url && <Typography variant="body2"><strong>File bài nói:</strong> <a href={item.user_answer_url} target="_blank" rel="noopener noreferrer">Xem file</a></Typography>}
+                {item.user_answer_signed_url || item.user_answer_url ? (
+                  <Typography variant="body2">
+                    <strong>File bài nói:</strong>{' '}
+                    <a
+                      href={item.user_answer_signed_url || item.user_answer_url || undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Xem file
+                    </a>
+                  </Typography>
+                ) : null}
                 {item.user_answer_text && <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mb: 2 }}><strong>Bài viết:</strong> {item.user_answer_text}</Typography>}
                 
                 <Typography variant="body2" sx={{ mb: 1 }}>

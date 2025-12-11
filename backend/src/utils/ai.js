@@ -394,7 +394,7 @@ export const gradeSpeaking = async (questionPrompt, audioFileKey) => {
     const transcript = await transcribeAudio(audioBuffer, audioFileKey);
     console.log(`      ✓ Transcript (${transcript.length} chars): ${transcript.substring(0, 100)}...`);
 
-    // 2b. Chấm điểm dựa trên so sánh từ trái qua phải, kiểm tra thứ tự
+    // 2b. Chấm điểm “chặt” hơn: mô hình vectơ + giữ thứ tự, phạt từ thừa/thiếu
     const normalize = (text) =>
       (text || '')
         .toLowerCase()
@@ -406,42 +406,94 @@ export const gradeSpeaking = async (questionPrompt, audioFileKey) => {
     const refWords = normalize(questionPrompt || '');
     const transcriptWords = normalize(transcript || '');
     const rawTranscriptWords = (transcript || '').split(/\s+/).filter(Boolean);
-
     const totalRef = refWords.length || 1; // tránh chia 0
 
-    // So khớp "mềm": một từ được tính là đúng nếu xuất hiện trong đề mẫu (bất kể vị trí)
-    // => tránh trường hợp chỉ vì sai 1 từ đầu mà các từ sau đúng vẫn bị tính sai hết.
-    let matchedCount = 0; // Số từ trùng (theo nội dung) với đề mẫu
+    // Vector space model: TF vectors + cosine similarity
+    const buildTf = (words) => {
+      const tf = new Map();
+      for (const w of words) tf.set(w, (tf.get(w) || 0) + 1);
+      return tf;
+    };
+    const refTf = buildTf(refWords);
+    const transTf = buildTf(transcriptWords);
+    const allTerms = new Set([...refTf.keys(), ...transTf.keys()]);
+    let dot = 0, refNorm = 0, transNorm = 0;
+    for (const term of allTerms) {
+      const a = refTf.get(term) || 0;
+      const b = transTf.get(term) || 0;
+      dot += a * b;
+      refNorm += a * a;
+      transNorm += b * b;
+    }
+    const cosineSim = dot === 0 ? 0 : dot / (Math.sqrt(refNorm) * Math.sqrt(transNorm) || 1);
+
+    // Longest Common Subsequence (LCS) để giữ thứ tự từ
+    const lcsLength = (() => {
+      const m = refWords.length;
+      const n = transcriptWords.length;
+      const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+      for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+          if (refWords[i - 1] === transcriptWords[j - 1]) {
+            dp[i][j] = dp[i - 1][j - 1] + 1;
+          } else {
+            dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+          }
+        }
+      }
+      return dp[m][n];
+    })();
+
+    // Vocab coverage (không xét thứ tự) dùng tập giao/đề mẫu
+    const uniqueRef = new Set(refWords);
+    const uniqueTranscript = new Set(transcriptWords);
+    let vocabMatches = 0;
+    for (const w of uniqueTranscript) {
+      if (uniqueRef.has(w)) vocabMatches++;
+    }
+    const vocabCoverage = vocabMatches / Math.max(uniqueRef.size, 1);
+
+    // Phạt từ thừa và thiếu
+    const extraWords = Math.max(transcriptWords.length - refWords.length, 0) / totalRef;
+    const missingWords = Math.max(refWords.length - lcsLength, 0) / totalRef;
+
+    // Điểm cuối: ưu tiên thứ tự (LCS), kết hợp cosine (mô hình vectơ) + coverage, trừ phạt
+    const orderedRatio = lcsLength / totalRef; // [0..1]
+    const baseScore = 0.5 * orderedRatio + 0.3 * cosineSim + 0.2 * vocabCoverage;
+    const penalty = Math.min(1, 0.5 * extraWords + 0.5 * missingWords);
+    const finalRatio = Math.max(0, Math.min(1, baseScore - penalty));
+    const finalScore = Math.round(finalRatio * 100);
+
+    // Đánh dấu token theo thứ tự (greedy scan)
+    let refIdx = 0;
     const tokenMatches = rawTranscriptWords.map((rawWord) => {
-      const normWord = normalize(rawWord)[0]; // Lấy từ đầu tiên sau normalize
-      if (!normWord) {
-        return { word: rawWord, match: false };
+      const normWord = normalize(rawWord)[0];
+      if (!normWord) return { word: rawWord, match: false };
+      while (refIdx < refWords.length && refWords[refIdx] !== normWord) {
+        refIdx++;
       }
-
-      const isMatch = refWords.includes(normWord);
-      if (isMatch) {
-        matchedCount++;
+      if (refIdx < refWords.length && refWords[refIdx] === normWord) {
+        refIdx++;
+        return { word: rawWord, match: true };
       }
-
-      return { word: rawWord, match: isMatch };
+      return { word: rawWord, match: false };
     });
 
-    // Tính điểm: số từ trùng / tổng số từ trong đề mẫu * 10
-    const ratio = matchedCount / totalRef;  // [0,1]
-    const score10 = ratio * 10;        // thang 0-10
-    const finalScore = Math.round(score10 * 10); // quy đổi sang 0-100
-
-    console.log(`      ✓ Vector scoring (từ trái qua phải): matched ${matchedCount}/${totalRef} words -> ${score10.toFixed(2)}/10`);
+    console.log(
+      `      ✓ Scoring: LCS ${lcsLength}/${totalRef}, vocab ${vocabMatches}/${uniqueRef.size}, penalty extra=${extraWords.toFixed(2)} missing=${missingWords.toFixed(2)} -> score ${finalScore}/100`
+    );
 
     const feedbackParts = [
       `Transcript (AI chuyển từ audio):`,
       `"${transcript}"`,
       ``,
-      `Vector scoring (so khớp từ với đề mẫu):`,
+      `Vector scoring (giữ thứ tự + phạt từ thừa/thiếu):`,
       `- Tổng số từ trong đề mẫu: ${totalRef}`,
-      // Sử dụng matchedCount thay vì biến không tồn tại "matched" để tránh ReferenceError
-      `- Số từ trùng khớp: ${matchedCount}`,
-      `- Điểm nội dung (0-10): ${score10.toFixed(2)}`
+      `- Độ phủ theo thứ tự (LCS): ${lcsLength}/${totalRef} -> ${(orderedRatio * 100).toFixed(1)}%`,
+      `- Cosine similarity (TF vector): ${(cosineSim * 100).toFixed(1)}%`,
+      `- Độ phủ từ vựng (không xét thứ tự): ${(vocabCoverage * 100).toFixed(1)}%`,
+      `- Phạt từ thừa: ${(extraWords * 100).toFixed(1)}% | Phạt thiếu: ${(missingWords * 100).toFixed(1)}%`,
+      `- Điểm cuối (0-100): ${finalScore}`
     ];
 
     // Gắn thêm JSON tokenMatches để frontend tô màu từng từ

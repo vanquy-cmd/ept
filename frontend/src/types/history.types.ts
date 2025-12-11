@@ -14,6 +14,7 @@ export interface AttemptResultItem {
   user_answer_text: string | null;
   user_answer_option_id: number | null;
   user_answer_url: string | null;
+  user_answer_signed_url?: string | null;
   is_correct: boolean | null;
   ai_feedback: string | null;
   ai_score: string | null;

@@ -1,5 +1,6 @@
-import React from 'react';
-import { Box, Typography, Paper } from '@mui/material';
+import React, { useRef } from 'react';
+import { Box, Typography, Paper, Button } from '@mui/material';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 
 interface TokenMatch {
   word: string;
@@ -10,39 +11,30 @@ interface SpeakingTranscriptDisplayProps {
   transcript: string;
   tokenMatches: TokenMatch[];
   targetSentence?: string; // Đề mẫu (target sentence)
-  score?: number;
+  audioUrl?: string | null;
 }
 
 const SpeakingTranscriptDisplay: React.FC<SpeakingTranscriptDisplayProps> = ({
   transcript,
   tokenMatches,
   targetSentence,
-  score
+  audioUrl
 }) => {
   // Parse target sentence thành từng từ để hiển thị
   const targetWords = targetSentence
     ? targetSentence.split(/\s+/).filter(Boolean)
     : [];
 
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const handlePlay = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {});
+    }
+  };
+
   return (
     <Box sx={{ mt: 2 }}>
-      {/* Score Display */}
-      {score !== undefined && (
-        <Paper
-          sx={{
-            p: 2,
-            mb: 2,
-            bgcolor: 'success.light',
-            color: 'success.contrastText',
-            textAlign: 'center'
-          }}
-        >
-          <Typography variant="h4" component="div" sx={{ fontWeight: 'bold' }}>
-            {score}%
-          </Typography>
-        </Paper>
-      )}
-
       {/* Target Sentence (Đề mẫu) - Hiển thị nếu có */}
       {targetSentence && targetWords.length > 0 && (
         <Paper
@@ -110,10 +102,28 @@ const SpeakingTranscriptDisplay: React.FC<SpeakingTranscriptDisplayProps> = ({
           sx={{
             mb: 1,
             color: 'text.secondary',
-            fontWeight: 500
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1
           }}
         >
-          Phát âm của bạn:
+          <span>Phát âm của bạn:</span>
+          {audioUrl && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <audio ref={audioRef} src={audioUrl} />
+              <Button
+                size="small"
+                variant="contained"
+                color="success"
+                onClick={handlePlay}
+                endIcon={<PlayArrowIcon />}
+              >
+                Nghe
+              </Button>
+            </Box>
+          )}
         </Typography>
         
         <Box
