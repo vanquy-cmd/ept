@@ -83,6 +83,8 @@ const DashboardPage: React.FC = () => {
 
     if (!data) return null;
 
+    const recentActivities = (data.recent_activity || []).slice(0, 8);
+
     return (
       <Box>
         {/* Thống kê tổng quan */}
@@ -207,7 +209,7 @@ const DashboardPage: React.FC = () => {
                 Hoạt động gần đây
               </Typography>
               <Typography variant="h4" fontWeight="bold">
-                {data.recent_activity.length}
+                {recentActivities.length}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 Trong 7 ngày qua
@@ -252,9 +254,9 @@ const DashboardPage: React.FC = () => {
               </Button>
             </Box>
             
-            {data.recent_activity.length > 0 ? (
+            {recentActivities.length > 0 ? (
               <List disablePadding>
-                {data.recent_activity.map((activity, index) => (
+                {recentActivities.map((activity, index) => (
                   <React.Fragment key={activity.attempt_id}>
                     <ListItem
                       component={RouterLink}
@@ -287,7 +289,7 @@ const DashboardPage: React.FC = () => {
                       />
                       <ChevronRightIcon color="action" />
                     </ListItem>
-                    {index < data.recent_activity.length - 1 && (
+                    {index < recentActivities.length - 1 && (
                       <Divider component="li" />
                     )}
                   </React.Fragment>
