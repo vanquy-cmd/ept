@@ -217,6 +217,23 @@ const QuizDoingPage: React.FC = () => {
         />
       </Box>
 
+      {/* Audio chung cho bài Listening (nếu có) */}
+      {quiz.quiz_asset_url && (
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+            File nghe
+          </Typography>
+          <audio
+            controls
+            src={quiz.quiz_asset_url}
+            crossOrigin="anonymous"
+            style={{ width: '100%' }}
+          >
+            Trình duyệt của bạn không hỗ trợ audio.
+          </audio>
+        </Box>
+      )}
+
       {/* Thanh tiến trình */}
       <Box sx={{ mb: 2 }}>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>

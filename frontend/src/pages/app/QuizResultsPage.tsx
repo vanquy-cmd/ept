@@ -9,9 +9,16 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'; 
 import CancelIcon from '@mui/icons-material/Cancel';
-import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import AIFeedbackDisplay from '../../components/AIFeedbackDisplay';
 import SpeakingTranscriptDisplay from '../../components/SpeakingTranscriptDisplay';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+
+// Nhận diện loại asset để hiển thị audio/ảnh trong phần xem lại
+const isAudioUrl = (url?: string | null) =>
+  !!url && /\.(mp3|wav|ogg|m4a|aac)$/i.test(url);
+
+const isImageUrl = (url?: string | null) =>
+  !!url && /\.(png|jpg|jpeg|gif|webp)$/i.test(url);
 
 // -----------------------------
 
@@ -71,12 +78,16 @@ const QuizResultsPage: React.FC = () => {
   };
 
   // Hàm render một câu hỏi (để review) BẰNG ACCORDION
-  const renderResultItem = (item: AttemptResultItem, index: number) => {
-    const isCorrect = item.is_correct === true;
-    const isIncorrect = item.is_correct === false;
+  const renderResultItem = (item: AttemptResultItem) => {
+    const correctness = item.is_correct as any; // backend có thể trả 0/1
+    const isCorrect = correctness === true || correctness === 1;
+    const isIncorrect = correctness === false || correctness === 0;
     const isAIGraded = item.question_type === 'essay' || item.question_type === 'speaking';
     const isSpeaking = item.question_type === 'speaking';
     const audioUrl = item.user_answer_signed_url || (item.user_answer_url?.startsWith('http') ? item.user_answer_url : undefined);
+    const assetAudio = item.asset_url && isAudioUrl(item.asset_url) ? item.asset_url : null;
+    const assetImage = item.asset_url && isImageUrl(item.asset_url) ? item.asset_url : null;
+    const fallbackAsset = item.asset_url && !assetAudio && !assetImage ? item.asset_url : null;
     
     // Style cho lựa chọn trắc nghiệm
     const getOptionStyle = (option: ResultOption) => {
@@ -108,22 +119,61 @@ const QuizResultsPage: React.FC = () => {
         {/* Nội dung Accordion (Chi tiết) */}
         <AccordionDetails sx={{ borderTop: (theme) => `1px solid ${theme.palette.divider}` }}>
           <Typography variant="body2" sx={{ mb: 1 }}><strong>Đề bài đầy đủ:</strong> {item.question_text}</Typography>
+
+          {/* Hiển thị asset kèm câu hỏi (audio/ảnh cho Listening/Speaking) */}
+          {item.asset_url && (
+            <Box sx={{ mb: 2 }}>
+              {assetAudio && (
+                <audio
+                  controls
+                  src={assetAudio}
+                  crossOrigin="anonymous"
+                  style={{ width: '100%' }}
+                >
+                  Trình duyệt của bạn không hỗ trợ audio.
+                </audio>
+              )}
+              {assetImage && (
+                <img
+                  src={assetImage}
+                  alt="Minh họa câu hỏi"
+                  style={{ width: '100%', maxHeight: 320, objectFit: 'contain' }}
+                />
+              )}
+              {!assetAudio && !assetImage && (
+                <audio
+                  controls
+                  src={fallbackAsset || undefined}
+                  crossOrigin="anonymous"
+                  style={{ width: '100%' }}
+                >
+                  Trình duyệt của bạn không hỗ trợ audio.
+                </audio>
+              )}
+            </Box>
+          )}
           
           {item.question_type === 'multiple_choice' && item.options && (
             <List dense>
-              {item.options.map((opt) => (
-                <ListItem key={opt.id}>
-                  <ListItemIcon>
-                    {/* Icon cho đáp án đúng */}
-                    {opt.is_correct && <CheckCircleIcon fontSize="small" color="success" />}
-                    {/* Icon cho người dùng chọn (nếu sai) */}
-                    {item.user_answer_option_id === opt.id && isIncorrect && <CancelIcon fontSize="small" color="error" />}
-                    {/* Icon mặc định */}
-                    {!(opt.is_correct) && !(item.user_answer_option_id === opt.id) && <RadioButtonUncheckedIcon fontSize="small" sx={{ opacity: 0.3 }} />}
-                  </ListItemIcon>
-                  <ListItemText primary={opt.option_text} sx={getOptionStyle(opt)} />
-                </ListItem>
-              ))}
+              {item.options.map((opt) => {
+                let icon;
+                if (opt.is_correct) {
+                  icon = <CheckCircleIcon fontSize="small" color="success" />;
+                } else if (item.user_answer_option_id === opt.id && isIncorrect) {
+                  icon = <CancelIcon fontSize="small" color="error" />;
+                } else {
+                  icon = <RadioButtonUncheckedIcon fontSize="small" sx={{ color: 'text.disabled' }} />;
+                }
+
+                return (
+                  <ListItem key={opt.id}>
+                    <ListItemIcon sx={{ minWidth: 24 }}>
+                      {icon}
+                    </ListItemIcon>
+                    <ListItemText primary={opt.option_text} sx={getOptionStyle(opt)} />
+                  </ListItem>
+                );
+              })}
             </List>
           )}
           

@@ -10,6 +10,13 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import * as lamejs from '@breezystack/lamejs';
 
+// Xác định loại asset để hiển thị đúng (audio hoặc ảnh)
+const isAudioUrl = (url?: string | null) =>
+  !!url && /\.(mp3|wav|ogg|m4a|aac)$/i.test(url);
+
+const isImageUrl = (url?: string | null) =>
+  !!url && /\.(png|jpg|jpeg|gif|webp)$/i.test(url);
+
 interface QuestionRendererProps {
   question: QuizQuestion;
   currentAnswer: UserAnswerValue | undefined;
@@ -584,17 +591,50 @@ const QuestionRenderer: React.FC<QuestionRendererProps> = ({
 
   return (
     <div>
-      {/* HiLƯU Ý: Thêm 'crossOrigin' để tránh lỗi CORS khi tải audio */}
-      {question.asset_url && (question.skill_focus === 'listening' || question.skill_focus === 'speaking') && (
-        <audio 
-          controls 
-          src={question.asset_url} 
-          crossOrigin="anonymous" 
-          style={{ width: '100%', marginBottom: '15px' }}
-        >
-          Trình duyệt của bạn không hỗ trợ file audio.
-        </audio>
-      )}
+      {/* Asset cho Listening/Speaking: ưu tiên audio, nhưng cho phép ảnh minh họa */}
+      {(() => {
+        let audioUrl: string | null = null;
+        let imageUrl: string | null = null;
+
+        if (question.asset_url) {
+          const looksAudio = isAudioUrl(question.asset_url);
+          const looksImage = isImageUrl(question.asset_url);
+
+          // Ưu tiên phân loại theo đuôi file
+          if (looksAudio) audioUrl = question.asset_url;
+          if (looksImage) imageUrl = question.asset_url;
+
+          // Trường hợp file không rõ đuôi: 
+          // - Với listening/speaking: hiển thị audio (ưu tiên) và thử hiển thị ảnh nếu không phải audio rõ ràng
+          if (!looksAudio && (question.skill_focus === 'listening' || question.skill_focus === 'speaking')) {
+            // Nếu không xác định là audio, thử hiển thị như ảnh minh họa
+            imageUrl = imageUrl || question.asset_url;
+          }
+        }
+
+        return (
+          <>
+            {audioUrl && (
+              <audio
+                controls
+                src={audioUrl}
+                crossOrigin="anonymous"
+                style={{ width: '100%', marginBottom: '12px' }}
+              >
+                Trình duyệt của bạn không hỗ trợ file audio.
+              </audio>
+            )}
+
+            {imageUrl && (
+              <img
+                src={imageUrl}
+                alt="Minh họa câu hỏi"
+                style={{ width: '100%', maxHeight: 320, objectFit: 'contain', marginBottom: '12px' }}
+              />
+            )}
+          </>
+        );
+      })()}
       
       <p style={{ fontSize: '18px', fontWeight: 'bold' }}>
         {question.question_text}

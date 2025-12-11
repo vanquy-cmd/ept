@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import FileUploadField from '../../components/FileUploadField';
 import type { QuizQuestion, QuizQuestionOption, Category } from '../../types';
 import { toast } from 'react-hot-toast';
 
@@ -243,12 +244,18 @@ const AdminQuestionFormPage: React.FC = () => {
             disabled={isSaving}
           />
 
-          {/* Asset URL */}
-          <TextField
-            margin="normal" fullWidth id="assetUrl" label="URL file đính kèm (Audio/Image - nếu có)"
-            name="assetUrl" value={assetUrl} onChange={(e) => setAssetUrl(e.target.value)}
-            disabled={isSaving} placeholder="https://..."
-          />
+          {/* Asset cho Listening/Speaking: chọn file từ máy hoặc nhập URL */}
+          {(skillFocus === 'listening' || skillFocus === 'speaking') && (
+            <Box sx={{ mt: 2 }}>
+              <FileUploadField
+                value={assetUrl}
+                onChange={setAssetUrl}
+                disabled={isSaving}
+                label="File đính kèm (Audio/Image)"
+                helperText="Chọn file từ máy hoặc nhập URL (hỗ trợ audio và ảnh minh họa cho Listening/Speaking)"
+              />
+            </Box>
+          )}
 
           {/* --- PHẦN HIỂN THỊ ĐỘNG --- */}
 

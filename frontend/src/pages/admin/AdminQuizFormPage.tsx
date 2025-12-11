@@ -163,10 +163,10 @@ const AdminQuizFormPage: React.FC = () => {
           options: []
         };
       } else if (currentQuestion) {
-        // Check if line is an option (starts with A. B. C. D.)
+        // Check if line is an option (A. / A) / (A) variants)
         // Loại bỏ khoảng trắng đầu dòng để match pattern
         const trimmedLine = line.trimStart();
-        const optionMatch = trimmedLine.match(/^([A-D])\.\s*(.+)$/i);
+        const optionMatch = trimmedLine.match(/^\(?([A-D])\)?[.)]?\s*(.+)$/i);
         
         if (optionMatch) {
           const label = optionMatch[1].toUpperCase();
