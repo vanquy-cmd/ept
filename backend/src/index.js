@@ -138,20 +138,12 @@ const startServer = async () => {
   }
 };
 
-// Export app và handler cho serverless platforms
-export { app };
-
-// Handler function cho serverless (AWS Lambda, Vercel, etc.)
-export const handler = async (event, context) => {
-  // Khởi tạo admin nếu chưa có (chỉ chạy một lần)
-  await ensureAdminUserExists();
-  
-  // Trả về app để serverless có thể xử lý
-  return app;
-};
+// Export default app cho serverless platforms (Vercel, AWS Lambda, etc.)
+// Platform sẽ tự động gọi app như một handler
+export default app;
 
 // Chạy máy chủ chỉ khi không phải môi trường serverless
 // Serverless platforms thường set biến môi trường đặc biệt
-if (!process.env.AWS_LAMBDA_FUNCTION_NAME && !process.env.VERCEL) {
+if (!process.env.AWS_LAMBDA_FUNCTION_NAME && !process.env.VERCEL && !process.env.RAILWAY_ENVIRONMENT) {
   startServer();
 }
