@@ -124,7 +124,8 @@ const startServer = async () => {
     // 1. Đảm bảo Admin User tồn tại
     await ensureAdminUserExists();
 
-    // 2. Khởi động máy chủ
+    // 2. Khởi động máy chủgfg
+    
     const PORT = process.env.PORT || 4000;
     app.listen(PORT, () => {
       console.log(`🚀 Máy chủ đang chạy tại http://localhost:${PORT}`);
