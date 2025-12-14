@@ -34,6 +34,5 @@ declare module '@mui/icons-material/Search';
 declare module '@mui/icons-material/SwapHoriz';
 declare module '@mui/icons-material/Send';
 declare module '@mui/icons-material/DeleteOutline';
-declare module '@mui/icons-material/AdminPanelSettings';
 declare module '@mui/icons-material/Person';
-declare module '@mui/icons-material/VideoFile';
+declare module '@mui/icons-material/AdminPanelSettings';

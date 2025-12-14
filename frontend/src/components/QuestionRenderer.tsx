@@ -124,33 +124,6 @@ const QuestionRenderer: React.FC<QuestionRendererProps> = ({
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     onAnswerChange(question.question_id, { answer_text: e.target.value });
   };
-
-  // 2b. Xử lý cho Điền từ với nhiều chỗ trống
-  const handleBlankAnswerChange = (blankKey: string, value: string) => {
-    try {
-      // Lấy đáp án hiện tại (có thể là JSON string hoặc plain text)
-      const currentAnswerText = currentAnswer?.answer_text || '{}';
-      let blankAnswers: Record<string, string> = {};
-      
-      // Thử parse JSON, nếu không được thì tạo object mới
-      try {
-        blankAnswers = JSON.parse(currentAnswerText);
-        if (typeof blankAnswers !== 'object' || Array.isArray(blankAnswers)) {
-          blankAnswers = {};
-        }
-      } catch {
-        blankAnswers = {};
-      }
-      
-      // Cập nhật đáp án cho blank này
-      blankAnswers[blankKey] = value;
-      
-      // Lưu lại dưới dạng JSON string
-      onAnswerChange(question.question_id, { answer_text: JSON.stringify(blankAnswers) });
-    } catch (err) {
-      console.error('Lỗi khi cập nhật đáp án:', err);
-    }
-  };
   
   // 3. Xử lý ghi âm trực tiếp (Bài Nói)
   const startRecording = async () => {
@@ -455,80 +428,16 @@ const QuestionRenderer: React.FC<QuestionRendererProps> = ({
       }
       
       // --- ĐIỀN TỪ (fill_blank) ---
-      case 'fill_blank': {
-        // Kiểm tra xem correct_answer có phải là JSON không (nhiều chỗ trống)
-        let blankAnswers: Record<string, string> | null = null;
-        try {
-          if (question.correct_answer) {
-            const parsed = JSON.parse(question.correct_answer);
-            if (typeof parsed === 'object' && !Array.isArray(parsed) && Object.keys(parsed).length > 0) {
-              blankAnswers = parsed;
-            }
-          }
-        } catch {
-          // Không phải JSON, xử lý như câu hỏi fill_blank thông thường
-        }
-
-        if (blankAnswers) {
-          // Hiển thị nhiều input fields cho nhiều chỗ trống
-          const currentAnswers: Record<string, string> = (() => {
-            try {
-              const parsed = currentAnswer?.answer_text ? JSON.parse(currentAnswer.answer_text) : {};
-              return typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-            } catch {
-              return {};
-            }
-          })();
-
-          // Tìm các placeholder [blankX] trong question_text
-          const blankKeys = Object.keys(blankAnswers);
-          
-          return (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {/* Hiển thị question_text với các input fields */}
-              <Box sx={{ whiteSpace: 'pre-wrap', mb: 2 }}>
-                {question.question_text.split(/(\[blank\d+\])/).map((part, idx) => {
-                  const blankMatch = part.match(/\[(blank\d+)\]/);
-                  if (blankMatch) {
-                    const blankKey = blankMatch[1];
-                    const blankIndex = blankKeys.indexOf(blankKey) + 1;
-                    return (
-                      <Box key={idx} component="span" sx={{ display: 'inline-flex', alignItems: 'center', mx: 0.5 }}>
-                        <input
-                          type="text"
-                          placeholder={`Chỗ trống ${blankIndex}`}
-                          value={currentAnswers[blankKey] || ''}
-                          onChange={(e) => handleBlankAnswerChange(blankKey, e.target.value)}
-                          style={{
-                            minWidth: '200px',
-                            padding: '8px 12px',
-                            fontSize: '14px',
-                            border: '1px solid #ccc',
-                            borderRadius: '4px',
-                            backgroundColor: '#fff'
-                          }}
-                        />
-                      </Box>
-                    );
-                  }
-                  return <span key={idx}>{part}</span>;
-                })}
-              </Box>
-            </Box>
-          );
-        } else {
-          // Hiển thị một input field cho câu hỏi fill_blank thông thường
-          return (
-            <input
-              type="text"
-              placeholder="Điền câu trả lời của bạn"
-              value={currentAnswer?.answer_text || ''}
-              onChange={handleTextChange}
-              style={{ width: '100%', padding: '10px', fontSize: '16px' }}
-            />
-          );
-        }
-      }
+      case 'fill_blank':
+        return (
+          <input
+            type="text"
+            placeholder="Điền câu trả lời của bạn"
+            value={currentAnswer?.answer_text || ''}
+            onChange={handleTextChange}
+            style={{ width: '100%', padding: '10px', fontSize: '16px' }}
+          />
+        );
       
       // --- VIẾT LUẬN (essay) ---
       case 'essay':

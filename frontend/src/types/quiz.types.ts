@@ -33,7 +33,6 @@ export interface QuizDetail {
   quiz_description: string | null;
   time_limit_minutes: number | null;
   quiz_asset_url?: string | null; // URL file audio/image cho quiz (đặc biệt cho Listening)
-  quiz_video_url?: string | null; // URL video cho quiz
   questions: QuizQuestion[];
 }
 

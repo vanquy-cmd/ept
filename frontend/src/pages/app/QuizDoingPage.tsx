@@ -217,23 +217,6 @@ const QuizDoingPage: React.FC = () => {
         />
       </Box>
 
-      {/* Video chung cho đề thi (nếu có) */}
-      {quiz.quiz_video_url && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-            Video
-          </Typography>
-          <video
-            controls
-            src={quiz.quiz_video_url}
-            crossOrigin="anonymous"
-            style={{ width: '100%', maxHeight: '500px', borderRadius: '8px' }}
-          >
-            Trình duyệt của bạn không hỗ trợ video.
-          </video>
-        </Box>
-      )}
-
       {/* Audio chung cho bài Listening (nếu có) */}
       {quiz.quiz_asset_url && (
         <Box sx={{ mb: 2 }}>
