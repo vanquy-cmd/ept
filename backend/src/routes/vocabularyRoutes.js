@@ -10,7 +10,8 @@ import {
   handleGetSetDetails,
   handleCreateSet,
   handleUpdateSet,
-  handleDeleteSet
+  handleDeleteSet,
+  handleDeleteTranslationHistory
 } from '../controllers/vocabularyController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { admin } from '../middleware/adminMiddleware.js';
@@ -31,6 +32,10 @@ router.post('/audio', protect, handleFetchDictionaryAudio);
 // GET /api/vocabulary/history
 // Lấy lịch sử tra từ điển của user
 router.get('/history', protect, handleGetTranslationHistory);
+
+// DELETE /api/vocabulary/history
+// Xóa lịch sử tra từ điển của user
+router.delete('/history', protect, handleDeleteTranslationHistory);
 
 // GET /api/vocabulary/sets
 // Lấy tất cả các bộ từ vựng

@@ -11,12 +11,15 @@ import {
   IconButton,
   Fab,
   Slide,
-  useTheme
+  useTheme,
+  Tooltip
 } from '@mui/material';
 import TranslateIcon from '@mui/icons-material/Translate';
-import GoogleIcon from '@mui/icons-material/Google';
+import SendIcon from '@mui/icons-material/Send';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import DeleteIcon from '@mui/icons-material/Delete';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
 interface TranslationResult {
   original: string;
@@ -49,15 +52,24 @@ const DictionaryChatbox: React.FC = () => {
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [chatHistory, setChatHistory] = useState<TranslationHistoryItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isDeletingHistory, setIsDeletingHistory] = useState(false);
   const [currentWord, setCurrentWord] = useState<string>('');
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const MAX_LENGTH = 50;
   
   // Màu xanh nước biển theo chủ đề
-  const primaryColor = theme.palette.primary.main; // #2b6cb0 (light) hoặc #63b3ed (dark)
-  const primaryLight = theme.palette.mode === 'light' ? '#E3F2FD' : '#1E3A5F'; // Xanh nước biển nhạt
-  const primaryDark = theme.palette.mode === 'light' ? '#1E88E5' : '#90CAF9'; // Xanh nước biển đậm
+  const primaryColor = theme.palette.primary.main;
+  const primaryLight = theme.palette.mode === 'light' ? '#E3F2FD' : '#1E3A5F';
+  const primaryDark = theme.palette.mode === 'light' ? '#1E88E5' : '#90CAF9';
+  
+  // Màu chữ theo theme để đảm bảo đọc được
+  const textPrimary = theme.palette.mode === 'light' 
+    ? theme.palette.text.primary 
+    : theme.palette.text.primary;
+  const textSecondary = theme.palette.mode === 'light'
+    ? theme.palette.text.secondary
+    : theme.palette.text.secondary;
 
   // Load lịch sử khi mở chatbox
   useEffect(() => {
@@ -79,12 +91,30 @@ const DictionaryChatbox: React.FC = () => {
       const response = await api.get<TranslationHistoryItem[]>('/api/vocabulary/history', {
         params: { limit: 50 }
       });
-      // Đảo ngược để hiển thị từ cũ đến mới (từ trên xuống dưới)
       setChatHistory(response.data.reverse());
     } catch (err) {
       console.error('Lỗi khi tải lịch sử:', err);
     } finally {
       setIsLoadingHistory(false);
+    }
+  };
+
+  const handleDeleteHistory = async () => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử chat?')) {
+      return;
+    }
+
+    setIsDeletingHistory(true);
+    try {
+      await api.delete('/api/vocabulary/history');
+      setChatHistory([]);
+      setResult(null);
+      setCurrentWord('');
+    } catch (err) {
+      console.error('Lỗi khi xóa lịch sử:', err);
+      setError('Không thể xóa lịch sử. Vui lòng thử lại.');
+    } finally {
+      setIsDeletingHistory(false);
     }
   };
 
@@ -265,12 +295,12 @@ const DictionaryChatbox: React.FC = () => {
               justifyContent: 'space-between',
               p: 1.5,
               bgcolor: primaryLight, // Màu xanh nước biển nhạt
-              color: 'text.primary'
+              color: textPrimary
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <MenuBookIcon sx={{ color: '#FF9800', fontSize: 28 }} />
-              <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1rem' }}>
+              <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1rem', color: textPrimary }}>
                 Tra từ vựng
               </Typography>
               <Box
@@ -283,18 +313,43 @@ const DictionaryChatbox: React.FC = () => {
                 }}
               />
             </Box>
-            <IconButton
-              onClick={handleClose}
-              size="small"
-              sx={{
-                color: 'text.primary',
-                '&:hover': {
-                  bgcolor: 'rgba(0,0,0,0.05)'
-                }
-              }}
-            >
-              <ExpandMoreIcon />
-            </IconButton>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              {/* Nút xóa lịch sử */}
+              {chatHistory.length > 0 && (
+                <Tooltip title="Xóa lịch sử chat">
+                  <IconButton
+                    onClick={handleDeleteHistory}
+                    disabled={isDeletingHistory}
+                    size="small"
+                    sx={{
+                      color: textPrimary,
+                      '&:hover': {
+                        bgcolor: 'rgba(244, 67, 54, 0.1)',
+                        color: '#f44336'
+                      }
+                    }}
+                  >
+                    {isDeletingHistory ? (
+                      <CircularProgress size={16} />
+                    ) : (
+                      <DeleteOutlineIcon fontSize="small" />
+                    )}
+                  </IconButton>
+                </Tooltip>
+              )}
+              <IconButton
+                onClick={handleClose}
+                size="small"
+                sx={{
+                  color: textPrimary,
+                  '&:hover': {
+                    bgcolor: 'rgba(0,0,0,0.05)'
+                  }
+                }}
+              >
+                <ExpandMoreIcon />
+              </IconButton>
+            </Box>
           </Box>
 
           {/* Content - Chat History Area */}
@@ -345,7 +400,7 @@ const DictionaryChatbox: React.FC = () => {
                     <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
                       <Paper
                         sx={{
-                          bgcolor: '#F5F5F5',
+                          bgcolor: theme.palette.mode === 'light' ? '#F5F5F5' : '#2C2C2C',
                           p: 2,
                           borderRadius: 2,
                           maxWidth: '85%',
@@ -355,10 +410,18 @@ const DictionaryChatbox: React.FC = () => {
                       >
                         {/* Cụm tiếng Anh */}
                         <Box sx={{ mb: 1.5 }}>
-                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold', mb: 0.5, display: 'block' }}>
+                          <Typography 
+                            variant="caption" 
+                            sx={{ 
+                              fontWeight: 'bold', 
+                              mb: 0.5, 
+                              display: 'block',
+                              color: textSecondary
+                            }}
+                          >
                             Cụm tiếng Anh:
                           </Typography>
-                          <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                          <Typography variant="body2" sx={{ color: textPrimary }}>
                             {item.translated_text} ({item.original_text} - {item.suggestions?.[0] || ''})
                           </Typography>
                         </Box>
@@ -366,13 +429,21 @@ const DictionaryChatbox: React.FC = () => {
                         {/* Cụm từ tương đương */}
                         {item.suggestions && item.suggestions.length > 0 && (
                           <Box sx={{ mb: 1.5 }}>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold', mb: 0.5, display: 'block' }}>
+                            <Typography 
+                              variant="caption" 
+                              sx={{ 
+                                fontWeight: 'bold', 
+                                mb: 0.5, 
+                                display: 'block',
+                                color: textSecondary
+                              }}
+                            >
                               Cụm từ tương đương:
                             </Typography>
                             <Box component="ul" sx={{ m: 0, pl: 2 }}>
                               {item.suggestions.slice(0, 3).map((suggestion, index) => (
                                 <Box component="li" key={index}>
-                                  <Typography variant="body2" sx={{ color: 'text.primary', fontSize: '0.875rem' }}>
+                                  <Typography variant="body2" sx={{ color: textPrimary, fontSize: '0.875rem' }}>
                                     {suggestion}
                                   </Typography>
                                 </Box>
@@ -384,10 +455,18 @@ const DictionaryChatbox: React.FC = () => {
                         {/* Câu gợi ý */}
                         {item.example_sentence && (
                           <Box>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold', mb: 0.5, display: 'block' }}>
+                            <Typography 
+                              variant="caption" 
+                              sx={{ 
+                                fontWeight: 'bold', 
+                                mb: 0.5, 
+                                display: 'block',
+                                color: textSecondary
+                              }}
+                            >
                               Câu gợi ý:
                             </Typography>
-                            <Typography variant="body2" sx={{ color: 'text.primary', lineHeight: 1.6, fontSize: '0.875rem' }}>
+                            <Typography variant="body2" sx={{ color: textPrimary, lineHeight: 1.6, fontSize: '0.875rem' }}>
                               {highlightTranslatedWord(item.example_sentence, item.translated_text)}
                             </Typography>
                           </Box>
@@ -424,7 +503,7 @@ const DictionaryChatbox: React.FC = () => {
                 <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
                   <Paper
                     sx={{
-                      bgcolor: '#F5F5F5',
+                      bgcolor: theme.palette.mode === 'light' ? '#F5F5F5' : '#2C2C2C',
                       p: 2,
                       borderRadius: 2,
                       maxWidth: '85%',
@@ -434,10 +513,18 @@ const DictionaryChatbox: React.FC = () => {
                   >
                     {/* Cụm tiếng Anh */}
                     <Box sx={{ mb: 1.5 }}>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold', mb: 0.5, display: 'block' }}>
+                      <Typography 
+                        variant="caption" 
+                        sx={{ 
+                          fontWeight: 'bold', 
+                          mb: 0.5, 
+                          display: 'block',
+                          color: textSecondary
+                        }}
+                      >
                         Cụm tiếng Anh:
                       </Typography>
-                      <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                      <Typography variant="body2" sx={{ color: textPrimary }}>
                         {result.translated} ({result.original} - {result.suggestions?.slice(0, 2).join(', ') || ''})
                       </Typography>
                     </Box>
@@ -445,13 +532,21 @@ const DictionaryChatbox: React.FC = () => {
                     {/* Cụm từ tương đương */}
                     {result.suggestions && result.suggestions.length > 0 && (
                       <Box sx={{ mb: 1.5 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold', mb: 0.5, display: 'block' }}>
+                        <Typography 
+                          variant="caption" 
+                          sx={{ 
+                            fontWeight: 'bold', 
+                            mb: 0.5, 
+                            display: 'block',
+                            color: textSecondary
+                          }}
+                        >
                           Cụm từ tương đương:
                         </Typography>
                         <Box component="ul" sx={{ m: 0, pl: 2 }}>
                           {result.suggestions.map((suggestion, index) => (
                             <Box component="li" key={index} sx={{ mb: 0.5 }}>
-                              <Typography variant="body2" sx={{ color: 'text.primary', fontSize: '0.875rem' }}>
+                              <Typography variant="body2" sx={{ color: textPrimary, fontSize: '0.875rem' }}>
                                 {suggestion}
                               </Typography>
                             </Box>
@@ -463,10 +558,18 @@ const DictionaryChatbox: React.FC = () => {
                     {/* Câu gợi ý */}
                     {result.example_sentence && (
                       <Box>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold', mb: 0.5, display: 'block' }}>
+                        <Typography 
+                          variant="caption" 
+                          sx={{ 
+                            fontWeight: 'bold', 
+                            mb: 0.5, 
+                            display: 'block',
+                            color: textSecondary
+                          }}
+                        >
                           Câu gợi ý:
                         </Typography>
-                        <Typography variant="body2" sx={{ color: 'text.primary', lineHeight: 1.6, fontSize: '0.875rem' }}>
+                        <Typography variant="body2" sx={{ color: textPrimary, lineHeight: 1.6, fontSize: '0.875rem' }}>
                           {highlightTranslatedWord(result.example_sentence, result.translated)}
                         </Typography>
                       </Box>
@@ -488,7 +591,7 @@ const DictionaryChatbox: React.FC = () => {
                   textAlign: 'center'
                 }}
               >
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                <Typography variant="body2" sx={{ color: textSecondary }}>
                   Bạn hãy nhập từ hoặc cụm từ tiếng Việt, YouPass sẽ gợi ý cụm từ tiếng Anh tương ứng
                 </Typography>
               </Box>
@@ -539,18 +642,23 @@ const DictionaryChatbox: React.FC = () => {
                     }
                   }}
                 />
-                <IconButton
-                  onClick={() => handleGoogleSearch(input || 'vocabulary')}
-                  sx={{ 
-                    color: primaryColor,
-                    '&:hover': {
-                      bgcolor: `${primaryColor}1A` // 10% opacity
-                    }
-                  }}
-                  title="Tìm trên Google"
-                >
-                  <GoogleIcon />
-                </IconButton>
+                <Tooltip title="Gửi">
+                  <IconButton
+                    onClick={handleTranslate}
+                    disabled={isLoading || !input.trim()}
+                    sx={{ 
+                      color: primaryColor,
+                      '&:hover': {
+                        bgcolor: `${primaryColor}1A`
+                      },
+                      '&:disabled': {
+                        color: theme.palette.action.disabled
+                      }
+                    }}
+                  >
+                    <SendIcon />
+                  </IconButton>
+                </Tooltip>
               </Box>
             </Box>
 
@@ -563,7 +671,7 @@ const DictionaryChatbox: React.FC = () => {
                 pt: 1
               }}
             >
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" sx={{ color: textSecondary }}>
                 Giới hạn: {input.length}/{MAX_LENGTH} ký tự
               </Typography>
               <Button

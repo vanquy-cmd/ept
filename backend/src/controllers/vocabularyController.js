@@ -6,7 +6,8 @@ import {
   updateSetWithWords,
   deleteSet,
   saveTranslationHistory,
-  getTranslationHistory
+  getTranslationHistory,
+  deleteTranslationHistory
 } from '../models/vocabularyModel.js';
 import { translateVocabulary } from '../utils/ai.js';
 import { uploadBufferToS3 } from '../utils/s3.js';
@@ -322,5 +323,23 @@ export const handleFetchDictionaryAudio = async (req, res) => {
   } catch (error) {
     console.error('Lỗi khi xử lý audio từ điển:', error);
     res.status(500).json({ message: 'Lỗi máy chủ khi lấy audio từ điển.' });
+  }
+};
+
+/**
+ * Xóa lịch sử tra từ điển của user
+ */
+export const handleDeleteTranslationHistory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const affectedRows = await deleteTranslationHistory(userId);
+    res.status(200).json({ 
+      message: 'Xóa lịch sử thành công.',
+      deletedCount: affectedRows
+    });
+  } catch (error) {
+    console.error('Lỗi khi xóa lịch sử tra từ điển:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi xóa lịch sử tra từ điển.' });
   }
 };

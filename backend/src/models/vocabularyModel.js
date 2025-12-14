@@ -283,3 +283,19 @@ export const getTranslationHistory = async (userId, limit = 50) => {
     throw error;
   }
 };
+
+/**
+ * Xóa lịch sử tra từ điển của user
+ */
+export const deleteTranslationHistory = async (userId) => {
+  try {
+    const [result] = await pool.query(
+      'DELETE FROM vocabulary_translation_history WHERE user_id = ?',
+      [userId]
+    );
+    return result.affectedRows;
+  } catch (error) {
+    console.error('Lỗi khi xóa lịch sử tra từ điển:', error);
+    throw error;
+  }
+};

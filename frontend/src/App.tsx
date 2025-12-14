@@ -48,6 +48,20 @@ import DictionaryChatbox from './components/DictionaryChatbox';
 
 function App() {
   const location = useLocation();
+  
+  // Danh sách các trang không hiển thị chatbox
+  const hideChatboxPaths = [
+    '/',
+    '/login',
+    '/register',
+    '/forgot-password',
+    '/profile',
+    '/dashboard'
+  ];
+  
+  const shouldShowChatbox = !location.pathname.startsWith('/admin') && 
+                            !hideChatboxPaths.includes(location.pathname);
+  
   return (
     <>
       {/* Không gắn key vào Routes để tránh unmount toàn bộ layout mỗi lần chuyển trang */}
@@ -111,8 +125,8 @@ function App() {
         <Route path="*" element={<NotFoundPage />} />
         </Routes>
       
-      {/* Dictionary Chatbox - Ẩn trên trang admin */}
-      {!location.pathname.startsWith('/admin') && <DictionaryChatbox />}
+      {/* Dictionary Chatbox - Ẩn trên các trang cụ thể */}
+      {shouldShowChatbox && <DictionaryChatbox />}
     </>
   );
 }
