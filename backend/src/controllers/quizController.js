@@ -290,7 +290,7 @@ export const handleSubmitQuiz = asyncHandler(async (req, res) => {
  */
 export const handleCreateQuiz = async (req, res) => {
   try {
-    const { category_id, title, description, time_limit_minutes, questionIds, asset_url } = req.body;
+    const { category_id, title, description, time_limit_minutes, questionIds, asset_url, video_url } = req.body;
 
     // 1. Validation
     if (!category_id || !title || !questionIds || !Array.isArray(questionIds)) {
@@ -303,7 +303,8 @@ export const handleCreateQuiz = async (req, res) => {
       title,
       description: description || null,
       time_limit_minutes: time_limit_minutes || null,
-      asset_url: asset_url || null // Thêm asset_url cho quiz
+      asset_url: asset_url || null, // Thêm asset_url cho quiz
+      video_url: video_url || null // Thêm video_url cho quiz
     };
 
     const newQuizId = await createQuizWithQuestions(quizData, questionIds);
@@ -324,7 +325,7 @@ export const handleCreateQuiz = async (req, res) => {
 export const handleUpdateQuiz = async (req, res) => {
   try {
     const { id } = req.params; // Lấy quizId từ URL
-    const { category_id, title, description, time_limit_minutes, questionIds, asset_url } = req.body;
+    const { category_id, title, description, time_limit_minutes, questionIds, asset_url, video_url } = req.body;
 
     // 1. Validation
     if (!category_id || !title || !questionIds || !Array.isArray(questionIds)) {
@@ -337,7 +338,8 @@ export const handleUpdateQuiz = async (req, res) => {
       title,
       description: description || null,
       time_limit_minutes: time_limit_minutes || null,
-      asset_url: asset_url || null // Thêm asset_url cho quiz
+      asset_url: asset_url || null, // Thêm asset_url cho quiz
+      video_url: video_url || null // Thêm video_url cho quiz
     };
 
     // 3. Gọi hàm update

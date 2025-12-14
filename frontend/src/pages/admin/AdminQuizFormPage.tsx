@@ -6,6 +6,7 @@ import api from '../../services/api';
 import type { QuizDetail, Category, AdminQuestionSummary } from '../../types';
 import { toast } from 'react-hot-toast';
 import FileUploadField from '../../components/FileUploadField';
+import VideoUploadField from '../../components/VideoUploadField';
 
 // --- THÊM/CẬP NHẬT IMPORT CỦA MUI ---
 import {
@@ -32,6 +33,9 @@ interface QuestionOption {
 interface ParsedQuestion {
   questionNumber?: number;
   questionText: string;
+  questionType?: 'multiple_choice' | 'fill_blank';
+  correctAnswer?: string; // Cho fill_blank - có thể là JSON string cho nhiều đáp án
+  blankAnswers?: Record<string, string>; // Cho câu hỏi có nhiều chỗ trống: { "blank1": "answer1", "blank2": "answer2" }
   options: Array<{
     label: string;
     text: string;
@@ -50,6 +54,7 @@ const AdminQuizFormPage: React.FC = () => {
   const [categoryId, setCategoryId] = useState('');
   const [timeLimit, setTimeLimit] = useState<number | ''>('');
   const [assetUrl, setAssetUrl] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
   const [selectedQuestions, setSelectedQuestions] = useState<MultiValue<QuestionOption>>([]);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [allQuestions, setAllQuestions] = useState<AdminQuestionSummary[]>([]);
@@ -61,6 +66,7 @@ const AdminQuizFormPage: React.FC = () => {
   const [importTextInput, setImportTextInput] = useState('');
   const [parsedQuestions, setParsedQuestions] = useState<ParsedQuestion[]>([]);
   const [importSkillFocus, setImportSkillFocus] = useState<'reading' | 'listening' | 'speaking' | 'writing'>('reading');
+  const [importQuestionType, setImportQuestionType] = useState<'multiple_choice' | 'fill_blank'>('multiple_choice');
   const [isImporting, setIsImporting] = useState(false);
 
   // Tải categories, questions và dữ liệu quiz (nếu edit)
@@ -95,6 +101,8 @@ const AdminQuizFormPage: React.FC = () => {
           setTimeLimit(quizData.time_limit_minutes || '');
           // Lấy asset_url từ quiz nếu có
           setAssetUrl(quizData.quiz_asset_url || '');
+          // Lấy video_url từ quiz nếu có
+          setVideoUrl(quizData.quiz_video_url || '');
           
           // Chuyển đổi questions của quiz thành dạng react-select options
           const currentQuizQuestions = quizData.questions.map(q => ({
@@ -135,71 +143,164 @@ const AdminQuizFormPage: React.FC = () => {
       }));
   }, [allQuestions, selectedCategory]);
 
-  // Parse text to questions (tương tự AdminQuestionImportPage)
+  // Parse text to questions (hỗ trợ cả multiple_choice và fill_blank)
   const parseQuestions = (text: string): ParsedQuestion[] => {
     const questions: ParsedQuestion[] = [];
-    // Không trim các dòng để giữ nguyên khoảng trống trong câu hỏi
-    // Chỉ loại bỏ dòng hoàn toàn trống
     const lines = text.split('\n').filter(line => line.trim().length > 0);
     
-    let currentQuestion: ParsedQuestion | null = null;
-    let i = 0;
-
-    while (i < lines.length) {
-      const line = lines[i];
+    if (importQuestionType === 'fill_blank') {
+      // Kiểm tra xem có format "Conversation" không (một câu hỏi lớn với nhiều chỗ trống)
+      const hasConversationFormat = lines.some(line => 
+        /^Conversation\s+\d+/i.test(line.trim())
+      );
       
-      // Check if line is a question (starts with number followed by period)
-      // Loại bỏ khoảng trắng đầu dòng nhưng giữ nguyên phần sau số
-      const trimmedLine = line.trimStart();
-      const questionMatch = trimmedLine.match(/^(\d+)\.\s*(.+)$/);
-      
-      if (questionMatch) {
-        // Save previous question if exists
-        if (currentQuestion && currentQuestion.questionText) {
-          questions.push(currentQuestion);
-        }
+      if (hasConversationFormat) {
+        // Parse format Conversation (một câu hỏi duy nhất với nhiều chỗ trống)
+        const blankAnswers: Record<string, string> = {};
+        let blankIndex = 1;
         
-        // Start new question - giữ nguyên toàn bộ phần câu hỏi kể cả khoảng trống
-        currentQuestion = {
-          questionNumber: parseInt(questionMatch[1]),
-          questionText: questionMatch[2].trimEnd(), // Giữ nguyên khoảng trống ở giữa, chỉ trim cuối dòng
-          options: []
-        };
-      } else if (currentQuestion) {
-        // Check if line is an option (A. / A) / (A) variants)
-        // Loại bỏ khoảng trắng đầu dòng để match pattern
-        const trimmedLine = line.trimStart();
-        const optionMatch = trimmedLine.match(/^\(?([A-D])\)?[.)]?\s*(.+)$/i);
-        
-        if (optionMatch) {
-          const label = optionMatch[1].toUpperCase();
-          const text = optionMatch[2].trimEnd(); // Giữ nguyên khoảng trống, chỉ trim cuối
+        // Xử lý từng dòng để tìm chỗ trống
+        const processedLines = lines.map((line, idx) => {
+          const trimmed = line.trim();
+          const originalLine = line; // Giữ nguyên indentation
           
-          currentQuestion.options.push({
-            label,
-            text,
-            isCorrect: false
-          });
-        } else if (line.trim().length > 0) {
-          // If it's not an option but has content, might be continuation of question text
-          // Chỉ thêm vào nếu chưa có options (câu hỏi có thể xuống dòng)
-          if (currentQuestion.options.length === 0) {
-            // Giữ nguyên khoảng trống ở đầu dòng nếu có
+          // Pattern 1: "Câu hỏi? Đáp án" (có đáp án)
+          const questionWithAnswer = trimmed.match(/^(.+\?)\s+(.+)$/);
+          if (questionWithAnswer) {
+            const questionPart = questionWithAnswer[1].trim();
+            const answerPart = questionWithAnswer[2].trim();
+            // Nếu đáp án không phải là dấu gạch dưới, giữ nguyên
+            if (!answerPart.match(/^_+$/)) {
+              return originalLine;
+            }
+          }
+          
+          // Pattern 2: "Câu hỏi?" (chỉ có câu hỏi, không có đáp án)
+          const questionOnly = trimmed.match(/^(.+\?)\s*$/);
+          if (questionOnly) {
+            // Kiểm tra dòng tiếp theo có phải là chỗ trống không
+            const nextLine = idx < lines.length - 1 ? lines[idx + 1].trim() : '';
+            if (nextLine.match(/^_+$/)) {
+              // Dòng tiếp theo là chỗ trống, tạo blank
+              const blankKey = `blank${blankIndex++}`;
+              blankAnswers[blankKey] = '';
+              // Trả về dòng câu hỏi và đánh dấu dòng tiếp theo để bỏ qua
+              return originalLine;
+            }
+          }
+          
+          // Pattern 3: Dòng chỉ có dấu gạch dưới (chỗ trống)
+          if (trimmed.match(/^_+$/)) {
+            const blankKey = `blank${blankIndex++}`;
+            blankAnswers[blankKey] = '';
+            // Thay thế dòng gạch dưới bằng placeholder
+            const indent = originalLine.match(/^(\s*)/)?.[0] || '';
+            return `${indent}[${blankKey}]`;
+          }
+          
+          // Pattern 4: "Câu hỏi? _______" (câu hỏi và chỗ trống trên cùng dòng)
+          const questionWithBlank = trimmed.match(/^(.+\?)\s+_+$/);
+          if (questionWithBlank) {
+            const blankKey = `blank${blankIndex++}`;
+            blankAnswers[blankKey] = '';
+            const questionPart = questionWithBlank[1].trim();
+            const indent = originalLine.match(/^(\s*)/)?.[0] || '';
+            return `${indent}${questionPart} [${blankKey}]`;
+          }
+          
+          return originalLine;
+        });
+        
+        questions.push({
+          questionNumber: 1,
+          questionText: processedLines.join('\n'),
+          questionType: 'fill_blank',
+          correctAnswer: JSON.stringify(blankAnswers),
+          blankAnswers: blankAnswers,
+          options: []
+        });
+        
+        return questions;
+      } else {
+        // Parse format fill_blank thông thường: "Câu hỏi? Đáp án" hoặc "Câu hỏi?"
+        let questionNumber = 1;
+        for (const line of lines) {
+          const trimmed = line.trim();
+          // Pattern: "Câu hỏi? Đáp án" hoặc "Câu hỏi?"
+          const fillBlankMatch = trimmed.match(/^(.+\?)\s*(.+)?$/);
+          if (fillBlankMatch) {
+            const questionText = fillBlankMatch[1].trim();
+            const answer = fillBlankMatch[2]?.trim() || '';
+            
+            questions.push({
+              questionNumber: questionNumber++,
+              questionText,
+              questionType: 'fill_blank',
+              correctAnswer: answer,
+              options: []
+            });
+          } else if (trimmed.length > 0 && !trimmed.match(/^_+$/)) {
+            // Nếu không match pattern và không phải là dòng chỉ có dấu gạch dưới
+            questions.push({
+              questionNumber: questionNumber++,
+              questionText: trimmed,
+              questionType: 'fill_blank',
+              correctAnswer: '',
+              options: []
+            });
+          }
+        }
+        return questions;
+      }
+    } else {
+      // Parse format multiple_choice (logic cũ)
+      let currentQuestion: ParsedQuestion | null = null;
+      let i = 0;
+
+      while (i < lines.length) {
+        const line = lines[i];
+        const trimmedLine = line.trimStart();
+        const questionMatch = trimmedLine.match(/^(\d+)\.\s*(.+)$/);
+        
+        if (questionMatch) {
+          if (currentQuestion && currentQuestion.questionText) {
+            questions.push(currentQuestion);
+          }
+          
+          currentQuestion = {
+            questionNumber: parseInt(questionMatch[1]),
+            questionText: questionMatch[2].trimEnd(),
+            questionType: 'multiple_choice',
+            options: []
+          };
+        } else if (currentQuestion) {
+          const trimmedLine = line.trimStart();
+          const optionMatch = trimmedLine.match(/^\(?([A-D])\)?[.)]?\s*(.+)$/i);
+          
+          if (optionMatch) {
+            const label = optionMatch[1].toUpperCase();
+            const text = optionMatch[2].trimEnd();
+            
+            currentQuestion.options.push({
+              label,
+              text,
+              isCorrect: false
+            });
+          } else if (line.trim().length > 0 && currentQuestion.options.length === 0) {
             const spaceBefore = line.match(/^(\s*)/)?.[0] || '';
             currentQuestion.questionText += (spaceBefore ? ' ' : ' ') + line.trimEnd();
           }
         }
+        
+        i++;
       }
       
-      i++;
+      if (currentQuestion && currentQuestion.questionText) {
+        questions.push(currentQuestion);
+      }
+      
+      return questions.filter(q => q.options.length >= 2);
     }
-    
-    // Add last question
-    if (currentQuestion && currentQuestion.questionText) {
-      questions.push(currentQuestion);
-    }
-    
-    return questions.filter(q => q.options.length >= 2); // Only keep questions with at least 2 options
   };
 
   const handleParse = () => {
@@ -233,6 +334,32 @@ const AdminQuizFormPage: React.FC = () => {
     }));
   };
 
+  const handleFillBlankAnswerChange = (questionIndex: number, answer: string) => {
+    setParsedQuestions(prev => prev.map((q, qIdx) => {
+      if (qIdx === questionIndex) {
+        return {
+          ...q,
+          correctAnswer: answer
+        };
+      }
+      return q;
+    }));
+  };
+
+  const handleBlankAnswerChange = (questionIndex: number, blankKey: string, answer: string) => {
+    setParsedQuestions(prev => prev.map((q, qIdx) => {
+      if (qIdx === questionIndex && q.blankAnswers) {
+        const newBlankAnswers = { ...q.blankAnswers, [blankKey]: answer };
+        return {
+          ...q,
+          blankAnswers: newBlankAnswers,
+          correctAnswer: JSON.stringify(newBlankAnswers)
+        };
+      }
+      return q;
+    }));
+  };
+
   // Nhập hàng loạt và tự động thêm vào danh sách đã chọn
   const handleImportAndAdd = async () => {
     if (!categoryId) {
@@ -245,25 +372,57 @@ const AdminQuizFormPage: React.FC = () => {
       return;
     }
 
-    if (parsedQuestions.some(q => !q.options.some(opt => opt.isCorrect))) {
-      toast.error('Vui lòng đánh dấu đáp án đúng cho tất cả các câu hỏi.');
-      return;
+    // Validation: multiple_choice cần đánh dấu đáp án đúng, fill_blank cần có correctAnswer
+    if (importQuestionType === 'multiple_choice') {
+      if (parsedQuestions.some(q => !q.options.some(opt => opt.isCorrect))) {
+        toast.error('Vui lòng đánh dấu đáp án đúng cho tất cả các câu hỏi.');
+        return;
+      }
+    } else {
+      // Kiểm tra cả correctAnswer và blankAnswers
+      const hasEmptyAnswer = parsedQuestions.some(q => {
+        if (q.blankAnswers && Object.keys(q.blankAnswers).length > 0) {
+          // Kiểm tra tất cả các blank answers
+          return Object.values(q.blankAnswers).some(answer => !answer || answer.trim() === '');
+        } else {
+          // Kiểm tra correctAnswer thông thường
+          return !q.correctAnswer || q.correctAnswer.trim() === '';
+        }
+      });
+      
+      if (hasEmptyAnswer) {
+        toast.error('Vui lòng nhập đáp án đúng cho tất cả các chỗ trống.');
+        return;
+      }
     }
 
     setIsImporting(true);
     
     try {
       // Convert parsed questions to API format
-      const questionsToImport = parsedQuestions.map(q => ({
-        category_id: parseInt(categoryId),
-        skill_focus: importSkillFocus,
-        question_type: 'multiple_choice' as const,
-        question_text: q.questionText,
-        options: q.options.map(opt => ({
-          option_text: `${opt.label}. ${opt.text}`,
-          is_correct: opt.isCorrect
-        }))
-      }));
+      const questionsToImport = parsedQuestions.map(q => {
+        if (q.questionType === 'fill_blank') {
+          return {
+            category_id: parseInt(categoryId),
+            skill_focus: importSkillFocus,
+            question_type: 'fill_blank' as const,
+            question_text: q.questionText,
+            correct_answer: q.correctAnswer || '',
+            options: []
+          };
+        } else {
+          return {
+            category_id: parseInt(categoryId),
+            skill_focus: importSkillFocus,
+            question_type: 'multiple_choice' as const,
+            question_text: q.questionText,
+            options: q.options.map(opt => ({
+              option_text: `${opt.label}. ${opt.text}`,
+              is_correct: opt.isCorrect
+            }))
+          };
+        }
+      });
 
       const response = await api.post('/api/questions/bulk', { questions: questionsToImport });
       
@@ -333,6 +492,11 @@ const AdminQuizFormPage: React.FC = () => {
     // Chỉ thêm asset_url nếu là listening category
     if (isListeningCategory && assetUrl.trim()) {
       quizPayload.asset_url = assetUrl.trim();
+    }
+
+    // Thêm video_url nếu có (cho tất cả loại đề thi)
+    if (videoUrl.trim()) {
+      quizPayload.video_url = videoUrl.trim();
     }
 
     try {
@@ -460,6 +624,23 @@ const AdminQuizFormPage: React.FC = () => {
             </Box>
           )}
 
+          {/* Khối: Video đính kèm (cho tất cả đề thi) */}
+          <Box sx={{ p: 2.5, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+              Video đính kèm (Tùy chọn)
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Tải video lên hoặc nhập URL video (YouTube, Vimeo, hoặc direct link).
+            </Typography>
+            <VideoUploadField
+              value={videoUrl}
+              onChange={setVideoUrl}
+              disabled={isSaving}
+              label="Video đính kèm"
+              helperText="Video sẽ được hiển thị trong đề thi (tối đa 500MB)"
+            />
+          </Box>
+
           {/* Khối: Quản lý câu hỏi */}
           <Box sx={{ p: 2.5, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
@@ -510,17 +691,50 @@ const AdminQuizFormPage: React.FC = () => {
                   <Typography variant="body2">
                     Nhập câu hỏi theo định dạng sau, sau khi nhập xong các câu hỏi sẽ tự động được thêm vào đề thi:
                   </Typography>
-                  <pre style={{ marginTop: 8, marginBottom: 0, fontSize: '0.9em' }}>
+                  {importQuestionType === 'multiple_choice' ? (
+                    <pre style={{ marginTop: 8, marginBottom: 0, fontSize: '0.9em' }}>
 {`101. The car ______ to my uncle.
 A. belongs
 B. are belonging
 C. belong
 D. belonging`}
-                  </pre>
+                    </pre>
+                  ) : (
+                    <pre style={{ marginTop: 8, marginBottom: 0, fontSize: '0.9em' }}>
+{`Câu 1. Watch the video. Complete the notes...
+Conversation 1
+  What's your name? Chen
+  Where are you from? _______
+  Which part? _______
+Conversation 2
+  What's your name? Alexander
+  Where are you from? _______
+  Which part? _______`}
+                    </pre>
+                  )}
                 </Alert>
 
                 <Grid container spacing={2} sx={{ mb: 2 }}>
-                  <Grid size={{ xs: 12, sm: 6 }}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <FormControl fullWidth>
+                      <InputLabel id="import-question-type-label">Loại câu hỏi</InputLabel>
+                      <MuiSelect
+                        labelId="import-question-type-label"
+                        id="import-question-type-select"
+                        value={importQuestionType}
+                        label="Loại câu hỏi"
+                        onChange={(e) => {
+                          setImportQuestionType(e.target.value as 'multiple_choice' | 'fill_blank');
+                          setParsedQuestions([]);
+                          setImportTextInput('');
+                        }}
+                      >
+                        <MenuItem value="multiple_choice">Trắc nghiệm</MenuItem>
+                        <MenuItem value="fill_blank">Điền vào chỗ trống</MenuItem>
+                      </MuiSelect>
+                    </FormControl>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 4 }}>
                     <FormControl fullWidth>
                       <InputLabel id="import-skill-label">Kỹ năng</InputLabel>
                       <MuiSelect
@@ -537,7 +751,7 @@ D. belonging`}
                       </MuiSelect>
                     </FormControl>
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
                     <Button
                       variant="outlined"
                       onClick={handleParse}
@@ -555,7 +769,9 @@ D. belonging`}
                   multiline
                   rows={8}
                   label="Nhập nội dung câu hỏi"
-                  placeholder="Dán nội dung câu hỏi vào đây..."
+                  placeholder={importQuestionType === 'fill_blank' 
+                    ? "Ví dụ:\nCâu 1. Watch the video. Complete the notes...\nConversation 1\n  What's your name? Chen\n  Where are you from? _______\n  Which part? _______"
+                    : "Dán nội dung câu hỏi vào đây..."}
                   value={importTextInput}
                   onChange={(e) => setImportTextInput(e.target.value)}
                   sx={{ fontFamily: 'monospace', fontSize: '0.9em', mb: 2 }}
@@ -565,7 +781,9 @@ D. belonging`}
                   <>
                     <Divider sx={{ my: 2 }} />
                     <Alert severity="warning" sx={{ mb: 2 }}>
-                      Vui lòng click vào đáp án đúng cho từng câu hỏi trước khi nhập.
+                      {importQuestionType === 'multiple_choice' 
+                        ? 'Vui lòng click vào đáp án đúng cho từng câu hỏi trước khi nhập.'
+                        : 'Vui lòng nhập đáp án đúng cho từng câu hỏi trước khi nhập.'}
                     </Alert>
                     <Box sx={{ maxHeight: '300px', overflowY: 'auto', mb: 2 }}>
                       {parsedQuestions.map((q, qIdx) => (
@@ -582,33 +800,88 @@ D. belonging`}
                                 {q.questionText}
                               </Typography>
                             </Box>
-                            <Box sx={{ mt: 1 }}>
-                              {q.options.map((opt, optIdx) => (
-                                <Box
-                                  key={optIdx}
-                                  sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    p: 0.75,
-                                    mb: 0.5,
-                                    cursor: 'pointer',
-                                    borderRadius: 1,
-                                    bgcolor: opt.isCorrect ? 'success.light' : 'transparent',
-                                    '&:hover': { bgcolor: 'action.hover' }
-                                  }}
-                                  onClick={() => handleToggleCorrect(qIdx, optIdx)}
-                                >
-                                  {opt.isCorrect ? (
-                                    <CheckCircleIcon color="success" sx={{ mr: 1, fontSize: '1rem' }} />
-                                  ) : (
-                                    <CancelIcon color="disabled" sx={{ mr: 1, fontSize: '1rem' }} />
-                                  )}
-                                  <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                                    <strong>{opt.label}.</strong> {opt.text}
-                                  </Typography>
-                                </Box>
-                              ))}
-                            </Box>
+                            {q.questionType === 'fill_blank' ? (
+                              <Box sx={{ mt: 1 }}>
+                                {q.blankAnswers && Object.keys(q.blankAnswers).length > 0 ? (
+                                  // Hiển thị nhiều TextField cho nhiều chỗ trống
+                                  <Box>
+                                    <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                                      Nhập đáp án cho từng chỗ trống (theo thứ tự xuất hiện trong câu hỏi):
+                                    </Typography>
+                                    {Object.entries(q.blankAnswers).map(([blankKey, currentAnswer], blankIdx) => {
+                                      // Tìm câu hỏi trước chỗ trống này
+                                      const blankPattern = new RegExp(`\\[${blankKey}\\]`);
+                                      const blankIndex = q.questionText.search(blankPattern);
+                                      
+                                      let contextLabel = `Chỗ trống ${blankIdx + 1}`;
+                                      if (blankIndex > 0) {
+                                        // Tìm dòng chứa blank này
+                                        const textBefore = q.questionText.substring(0, blankIndex);
+                                        const linesBefore = textBefore.split('\n');
+                                        const currentLine = linesBefore[linesBefore.length - 1];
+                                        
+                                        // Tìm câu hỏi gần nhất (có dấu ?)
+                                        const questionMatch = currentLine.match(/([^?]+\?)/);
+                                        if (questionMatch) {
+                                          contextLabel = `${questionMatch[1].trim()} → Chỗ trống ${blankIdx + 1}`;
+                                        }
+                                      }
+                                      
+                                      return (
+                                        <TextField
+                                          key={blankKey}
+                                          fullWidth
+                                          size="small"
+                                          label={contextLabel}
+                                          value={currentAnswer || ''}
+                                          onChange={(e) => handleBlankAnswerChange(qIdx, blankKey, e.target.value)}
+                                          placeholder="Nhập đáp án..."
+                                          sx={{ mb: 1 }}
+                                        />
+                                      );
+                                    })}
+                                  </Box>
+                                ) : (
+                                  // Hiển thị một TextField cho một đáp án
+                                  <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Đáp án đúng"
+                                    value={q.correctAnswer || ''}
+                                    onChange={(e) => handleFillBlankAnswerChange(qIdx, e.target.value)}
+                                    placeholder="Nhập đáp án đúng..."
+                                  />
+                                )}
+                              </Box>
+                            ) : (
+                              <Box sx={{ mt: 1 }}>
+                                {q.options.map((opt, optIdx) => (
+                                  <Box
+                                    key={optIdx}
+                                    sx={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      p: 0.75,
+                                      mb: 0.5,
+                                      cursor: 'pointer',
+                                      borderRadius: 1,
+                                      bgcolor: opt.isCorrect ? 'success.light' : 'transparent',
+                                      '&:hover': { bgcolor: 'action.hover' }
+                                    }}
+                                    onClick={() => handleToggleCorrect(qIdx, optIdx)}
+                                  >
+                                    {opt.isCorrect ? (
+                                      <CheckCircleIcon color="success" sx={{ mr: 1, fontSize: '1rem' }} />
+                                    ) : (
+                                      <CancelIcon color="disabled" sx={{ mr: 1, fontSize: '1rem' }} />
+                                    )}
+                                    <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                                      <strong>{opt.label}.</strong> {opt.text}
+                                    </Typography>
+                                  </Box>
+                                ))}
+                              </Box>
+                            )}
                           </CardContent>
                         </Card>
                       ))}
@@ -621,15 +894,32 @@ D. belonging`}
                       disabled={
                         isImporting ||
                         !categoryId ||
-                        parsedQuestions.some((q) => !q.options.some((opt) => opt.isCorrect))
+                        (importQuestionType === 'multiple_choice' 
+                          ? parsedQuestions.some((q) => !q.options.some((opt) => opt.isCorrect))
+                          : parsedQuestions.some((q) => {
+                              if (q.blankAnswers && Object.keys(q.blankAnswers).length > 0) {
+                                return Object.values(q.blankAnswers).some(answer => !answer || answer.trim() === '');
+                              }
+                              return !q.correctAnswer || q.correctAnswer.trim() === '';
+                            }))
                       }
                       startIcon={isImporting ? <CircularProgress size={20} color="inherit" /> : null}
                     >
                       {isImporting ? 'Đang nhập...' : `Nhập và thêm ${parsedQuestions.length} câu hỏi vào đề thi`}
                     </Button>
-                    {parsedQuestions.some((q) => !q.options.some((opt) => opt.isCorrect)) && (
+                    {importQuestionType === 'multiple_choice' && parsedQuestions.some((q) => !q.options.some((opt) => opt.isCorrect)) && (
                       <Alert severity="error" sx={{ mt: 1 }}>
                         Vui lòng đánh dấu đáp án đúng cho tất cả các câu hỏi.
+                      </Alert>
+                    )}
+                    {importQuestionType === 'fill_blank' && parsedQuestions.some((q) => {
+                        if (q.blankAnswers && Object.keys(q.blankAnswers).length > 0) {
+                          return Object.values(q.blankAnswers).some(answer => !answer || answer.trim() === '');
+                        }
+                        return !q.correctAnswer || q.correctAnswer.trim() === '';
+                      }) && (
+                      <Alert severity="error" sx={{ mt: 1 }}>
+                        Vui lòng nhập đáp án đúng cho tất cả các chỗ trống.
                       </Alert>
                     )}
                   </>

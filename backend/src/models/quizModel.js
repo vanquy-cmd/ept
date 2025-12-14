@@ -35,7 +35,8 @@ export const getQuizDetailsById = async (quizId) => {
         title AS quiz_title,
         description AS quiz_description,
         time_limit_minutes,
-        asset_url AS quiz_asset_url
+        asset_url AS quiz_asset_url,
+        video_url AS quiz_video_url
       FROM quizzes
       WHERE id = ?`,
       [quizId]
