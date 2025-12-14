@@ -19,8 +19,13 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await auth.login(email, password);
-      navigate('/dashboard');
+      const user = await auth.login(email, password);
+      // Kiểm tra role và redirect tương ứng
+      if (user.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       console.error(err);
       const errorMessage = err.response?.data?.message || 'Đăng nhập thất bại.';

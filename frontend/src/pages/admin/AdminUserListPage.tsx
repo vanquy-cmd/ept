@@ -9,7 +9,8 @@ import { useAuth } from '../../contexts/AuthContext'; // Thêm import này
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Paper, Button, IconButton, CircularProgress, Alert, Box, Typography,
-  Pagination
+  Pagination,
+  Tooltip  // Thêm Tooltip
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -104,6 +105,21 @@ const AdminUserListPage: React.FC = () => {
     return false;
   };
 
+  // Thêm function này sau canDeleteUser (sau dòng 105)
+  const getDeleteTooltip = (targetUser: User): string => {
+    if (!currentUser) return 'Không có quyền xóa';
+    
+    if (currentUser.id === targetUser.id) {
+      return 'Bạn không thể xóa chính mình';
+    }
+    
+    if (currentUser.email !== 'admin@ept.tdmu.edu.vn' && targetUser.role === 'admin') {
+      return 'Bạn không có quyền xóa tài khoản admin khác';
+    }
+    
+    return 'Xóa người dùng';
+  };
+
   // Hàm render nội dung sử dụng MUI Table
   const renderContent = () => {
     if (isLoading) {
@@ -163,17 +179,20 @@ const AdminUserListPage: React.FC = () => {
                   >
                     <EditIcon />
                   </IconButton>
-                  {/* Chỉ hiển thị nút xóa nếu có quyền */}
-                  {canDeleteUser(user) && (
-                    <IconButton
-                      aria-label="delete"
-                      color="error"
-                      onClick={() => handleDelete(user.id, user.full_name || '')}
-                      sx={{ ml: 1 }}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  )}
+                  {/* Nút xóa luôn hiển thị nhưng disabled khi không có quyền */}
+                  <Tooltip title={getDeleteTooltip(user)}>
+                    <span>
+                      <IconButton
+                        aria-label="delete"
+                        color="error"
+                        onClick={() => handleDelete(user.id, user.full_name || '')}
+                        disabled={!canDeleteUser(user)}
+                        sx={{ ml: 1 }}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
                 </TableCell>
               </TableRow>
             ))}

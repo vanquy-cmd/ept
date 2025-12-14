@@ -7,7 +7,7 @@ interface AuthContextType {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   accessToken: string | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>; // Thay đổi return type
   logout: () => void;
   // (Chúng ta có thể thêm 'register' sau)
 }
@@ -44,7 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // Hàm Đăng nhập
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<User> => {
     // Gọi API login từ backend
     const response = await api.post('/api/users/login', {
       email,
@@ -64,6 +64,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Cập nhật header mặc định của axios
     api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+    
+    return user; // Trả về user để có thể sử dụng ngay
   };
 
   // Hàm Đăng xuất
