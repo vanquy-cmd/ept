@@ -1,5 +1,5 @@
 import React, { useState } from 'react'; // <-- Thêm useState
-import { Outlet, Link as RouterLink, useLocation } from 'react-router-dom';
+import { Outlet, Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useColorMode } from '../contexts/ColorModeContext';
 import {
@@ -19,6 +19,7 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import Brightness4Icon from '@mui/icons-material/Brightness4'; 
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import MenuIcon from '@mui/icons-material/Menu';
+import PersonIcon from '@mui/icons-material/Person';
 // -----------------------------
 
 const drawerWidth = 240; // Chiều rộng của Sidebar
@@ -38,6 +39,7 @@ const menuItems = [
 const AdminLayout: React.FC = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
+  const navigate = useNavigate(); // Thêm dòng này
   const theme = useTheme();
   const colorMode = useColorMode();
 
@@ -85,6 +87,19 @@ const AdminLayout: React.FC = () => {
       </List>
       <Divider sx={{ mt: 'auto' }} /> {/* Đẩy nút Logout xuống dưới */}
        <Box sx={{ p: 2 }}> {/* Thêm padding cho nút Logout */}
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => {
+              localStorage.setItem('viewingAsStudent', 'true');
+              navigate('/dashboard');
+            }}
+            fullWidth
+            startIcon={<PersonIcon />}
+            sx={{ mb: 2 }}
+          >
+            Xem giao diện Student
+          </Button>
           <Button variant="outlined" color="error" onClick={logout} fullWidth>
             Đăng xuất
           </Button>

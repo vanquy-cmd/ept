@@ -107,16 +107,37 @@ export const handleUpdateUser = asyncHandler(async (req, res) => {
  */
 export const handleDeleteUser = asyncHandler(async (req, res) => {
     const userId = req.params.id;
+    const currentUser = req.user; // User hiện tại đang thực hiện xóa
+    const SUPER_ADMIN_EMAIL = 'admin@ept.tdmu.edu.vn';
 
-    // (Tùy chọn) Ngăn admin xóa chính mình
-    if (req.user.id == userId) {
+    // 1. Không cho xóa chính mình
+    if (currentUser.id == userId) {
         res.status(400);
         throw new Error('Bạn không thể xóa chính mình.');
     }
+
+    // 2. Lấy thông tin user cần xóa
+    const targetUser = await getUserById(userId);
+    if (!targetUser) {
+        res.status(404);
+        throw new Error('Không tìm thấy người dùng.');
+    }
+
+    // 3. Kiểm tra quyền xóa
+    // - Super admin (admin@ept.tdmu.edu.vn) có thể xóa bất kỳ ai (trừ chính mình)
+    // - Admin thường chỉ có thể xóa student
+    if (currentUser.email !== SUPER_ADMIN_EMAIL) {
+        // Nếu không phải super admin
+        if (targetUser.role === 'admin') {
+            res.status(403);
+            throw new Error('Bạn không có quyền xóa tài khoản admin khác.');
+        }
+    }
     
+    // 4. Thực hiện xóa
     const affectedRows = await deleteUserAdmin(userId);
     if (affectedRows === 0) {
-         res.status(404);
+        res.status(404);
         throw new Error('Không tìm thấy người dùng.');
     }
     res.status(200).json({ message: 'Xóa người dùng thành công.' });

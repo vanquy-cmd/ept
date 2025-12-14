@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet, Link as RouterLink, useLocation } from 'react-router-dom';
+import { Outlet, Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useColorMode } from '../contexts/ColorModeContext';
 import Footer from './Footer'; // Import Footer
@@ -20,6 +20,7 @@ import SchoolIcon from '@mui/icons-material/School';
 import QuizIcon from '@mui/icons-material/Quiz';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import HomeIcon from '@mui/icons-material/Home';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 // ------------------------------
 
 // Cập nhật navItems để chứa icons
@@ -38,6 +39,7 @@ const StudentLayout: React.FC = () => {
   const location = useLocation();
   const theme = useTheme();
   const colorMode = useColorMode();
+  const navigate = useNavigate();
   
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -51,6 +53,10 @@ const StudentLayout: React.FC = () => {
   const displayAvatarUrl = user?.avatar_url 
     ? `${S3_BASE_URL}/${user.avatar_url}`
     : defaultAvatar;
+
+  // Thêm sau các biến declarations (sau dòng 50):
+  const viewingAsStudent = localStorage.getItem('viewingAsStudent') === 'true';
+  const isAdmin = user?.role === 'admin';
 
   // --- NỘI DUNG SIDEBAR (CHO MOBILE KHI ĐĂNG NHẬP) ---
   const drawerContent = (
@@ -176,6 +182,21 @@ const StudentLayout: React.FC = () => {
               ) : user ? (
                 // --- KHI ĐÃ ĐĂNG NHẬP ---
                 <>
+                  {/* Nút Trang Quản Trị - chỉ hiển thị cho admin khi đang xem giao diện student */}
+                  {isAdmin && viewingAsStudent && (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={() => {
+                        localStorage.removeItem('viewingAsStudent');
+                        navigate('/admin/dashboard');
+                      }}
+                      startIcon={<AdminPanelSettingsIcon />}
+                      sx={{ mr: 1, display: { xs: 'none', sm: 'flex' } }}
+                    >
+                      Trang Quản Trị
+                    </Button>
+                  )}
                   <Button
                     component={RouterLink}
                     to="/profile"

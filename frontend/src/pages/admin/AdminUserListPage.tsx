@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import type { User, PaginatedResponse } from '../../types';
 import { toast } from 'react-hot-toast'; // <-- 1. THÊM IMPORT
+import { useAuth } from '../../contexts/AuthContext'; // Thêm import này
 
 // --- (Import MUI giữ nguyên) ---
 import {
@@ -19,6 +20,7 @@ import AddIcon from '@mui/icons-material/Add';
 type UserPaginatedResponse = PaginatedResponse<User>;
 
 const AdminUserListPage: React.FC = () => {
+  const { user: currentUser } = useAuth(); // Thêm dòng này
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +78,30 @@ const AdminUserListPage: React.FC = () => {
   // Hàm xử lý thay đổi trang
   const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
     setPage(value); // Cập nhật state 'page', useEffect sẽ tự động gọi lại API
+  };
+
+  // Thêm function này sau các state declarations
+  const canDeleteUser = (targetUser: User): boolean => {
+    if (!currentUser) return false;
+    
+    const SUPER_ADMIN_EMAIL = 'admin@ept.tdmu.edu.vn';
+    
+    // Không thể xóa chính mình
+    if (currentUser.id === targetUser.id) {
+      return false;
+    }
+    
+    // Super admin có thể xóa bất kỳ ai (trừ chính mình)
+    if (currentUser.email === SUPER_ADMIN_EMAIL) {
+      return true;
+    }
+    
+    // Admin thường chỉ có thể xóa student
+    if (currentUser.role === 'admin' && targetUser.role === 'student') {
+      return true;
+    }
+    
+    return false;
   };
 
   // Hàm render nội dung sử dụng MUI Table
@@ -137,15 +163,17 @@ const AdminUserListPage: React.FC = () => {
                   >
                     <EditIcon />
                   </IconButton>
-                  {/* Nút Xóa dùng IconButton */}
-                  <IconButton
-                    aria-label="delete"
-                    color="error"
-                    onClick={() => handleDelete(user.id, user.full_name || '')} // Thêm || '' để tránh lỗi type
-                    sx={{ ml: 1 }} // Thêm margin left
-                  >
-                    <DeleteIcon />
-                  </IconButton>
+                  {/* Chỉ hiển thị nút xóa nếu có quyền */}
+                  {canDeleteUser(user) && (
+                    <IconButton
+                      aria-label="delete"
+                      color="error"
+                      onClick={() => handleDelete(user.id, user.full_name || '')}
+                      sx={{ ml: 1 }}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
