@@ -30,11 +30,11 @@ interface FeedbackData {
   overallScore: number;
   detailedScores: DetailedScore[];
   overallFeedback: string;
-  strengths: string[];
-  improvements: string[];
+  strengths: (string | { problem?: string; example?: string })[];
+  improvements: (string | { problem?: string; example?: string })[];
   grammarErrors: GrammarError[];
   vocabularyIssues: VocabularyIssue[];
-  recommendations: string[];
+  recommendations: (string | { problem?: string; example?: string })[];
 }
 
 interface Props {
@@ -121,14 +121,21 @@ const AIFeedbackDisplay: React.FC<Props> = ({ feedbackString }) => {
           </Typography>
           <Divider sx={{ mb: 2 }} />
           <List dense>
-            {feedbackData.strengths.map((strength, index) => (
-              <ListItem key={index}>
-                <ListItemIcon>
-                  <CheckCircleIcon color="success" fontSize="small" />
-                </ListItemIcon>
-                <ListItemText primary={strength} />
-              </ListItem>
-            ))}
+            {feedbackData.strengths.map((strength, index) => {
+              // Xử lý cả string và object
+              const strengthText = typeof strength === 'string' 
+                ? strength 
+                : (strength.problem || strength.example || JSON.stringify(strength));
+              
+              return (
+                <ListItem key={index}>
+                  <ListItemIcon>
+                    <CheckCircleIcon color="success" fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary={strengthText} />
+                </ListItem>
+              );
+            })}
           </List>
         </Paper>
       )}
@@ -141,14 +148,27 @@ const AIFeedbackDisplay: React.FC<Props> = ({ feedbackString }) => {
           </Typography>
           <Divider sx={{ mb: 2 }} />
           <List dense>
-            {feedbackData.improvements.map((improvement, index) => (
-              <ListItem key={index}>
-                <ListItemIcon>
-                  <TrendingUpIcon color="warning" fontSize="small" />
-                </ListItemIcon>
-                <ListItemText primary={improvement} />
-              </ListItem>
-            ))}
+            {feedbackData.improvements.map((improvement, index) => {
+              // Xử lý cả string và object
+              const improvementText = typeof improvement === 'string' 
+                ? improvement 
+                : (improvement.problem || improvement.example || JSON.stringify(improvement));
+              const improvementExample = typeof improvement === 'object' && improvement.example 
+                ? improvement.example 
+                : null;
+              
+              return (
+                <ListItem key={index}>
+                  <ListItemIcon>
+                    <TrendingUpIcon color="warning" fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary={improvementText}
+                    secondary={improvementExample}
+                  />
+                </ListItem>
+              );
+            })}
           </List>
         </Paper>
       )}
@@ -207,14 +227,21 @@ const AIFeedbackDisplay: React.FC<Props> = ({ feedbackString }) => {
           </Typography>
           <Divider sx={{ mb: 2 }} />
           <List dense>
-            {feedbackData.recommendations.map((rec, index) => (
-              <ListItem key={index}>
-                <ListItemIcon>
-                  <LightbulbIcon color="primary" fontSize="small" />
-                </ListItemIcon>
-                <ListItemText primary={rec} />
-              </ListItem>
-            ))}
+            {feedbackData.recommendations.map((rec, index) => {
+              // Xử lý cả string và object
+              const recText = typeof rec === 'string' 
+                ? rec 
+                : (rec.problem || rec.example || JSON.stringify(rec));
+              
+              return (
+                <ListItem key={index}>
+                  <ListItemIcon>
+                    <LightbulbIcon color="primary" fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary={recText} />
+                </ListItem>
+              );
+            })}
           </List>
         </Paper>
       )}

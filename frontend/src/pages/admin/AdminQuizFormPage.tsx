@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Select from 'react-select'; // Giữ lại react-select
 import type { MultiValue } from 'react-select';
 import api from '../../services/api';
-import type { QuizDetail, Category, AdminQuestionSummary, QuizQuestion, QuizQuestionOption } from '../../types';
+import type { QuizDetail, Category, AdminQuestionSummary } from '../../types';
 import { toast } from 'react-hot-toast';
 import FileUploadField from '../../components/FileUploadField';
 
@@ -11,13 +11,8 @@ import FileUploadField from '../../components/FileUploadField';
 import {
   TextField, Container, MenuItem, FormControl, InputLabel,
   Paper, Button, Grid, CircularProgress, Box, Typography,
-  FormHelperText, Tabs, Tab, Alert, Card, CardContent, Chip, Divider,
-  IconButton
+  FormHelperText, Tabs, Tab, Alert, Card, CardContent, Chip, Divider
 } from '@mui/material';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AudioFileIcon from '@mui/icons-material/AudioFile';
-import ImageIcon from '@mui/icons-material/Image';
 import type { SelectChangeEvent } from '@mui/material/Select'; // Đổi tên Select của MUI thành MuiSelect
 import MuiSelect from '@mui/material/Select';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -55,8 +50,6 @@ const AdminQuizFormPage: React.FC = () => {
   const [categoryId, setCategoryId] = useState('');
   const [timeLimit, setTimeLimit] = useState<number | ''>('');
   const [assetUrl, setAssetUrl] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isUploadingAsset, setIsUploadingAsset] = useState(false);
   const [selectedQuestions, setSelectedQuestions] = useState<MultiValue<QuestionOption>>([]);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [allQuestions, setAllQuestions] = useState<AdminQuestionSummary[]>([]);
@@ -120,17 +113,27 @@ const AdminQuizFormPage: React.FC = () => {
     loadData();
   }, [id, isEditMode]);
 
+  // Lấy skill_focus của category đã chọn (đặt trước useMemo để tránh lỗi hoisting)
+  const selectedCategory = allCategories.find(cat => cat.id.toString() === categoryId);
+  const isListeningCategory = selectedCategory?.skill_focus === 'listening';
+
   // Chuẩn bị options cho react-select từ allQuestions
   // Dùng useMemo để tránh tính toán lại không cần thiết
   const questionOptions = useMemo((): QuestionOption[] => {
       if (!Array.isArray(allQuestions)) {
         return [];
       }
-      return allQuestions.map(q => ({
+      // Nếu đã chọn chủ đề, chỉ hiển thị câu hỏi cùng skill_focus với chủ đề đó
+      const filtered = allQuestions.filter(q => {
+        if (!selectedCategory) return true;
+        return q.skill_focus === selectedCategory.skill_focus;
+      });
+
+      return filtered.map(q => ({
           value: q.id,
           label: `ID: ${q.id} - ${q.question_type} (${q.skill_focus}) - ${q.question_text}`
       }));
-  }, [allQuestions]);
+  }, [allQuestions, selectedCategory]);
 
   // Parse text to questions (tương tự AdminQuestionImportPage)
   const parseQuestions = (text: string): ParsedQuestion[] => {
@@ -308,10 +311,6 @@ const AdminQuizFormPage: React.FC = () => {
   };
 
 
-  // Lấy skill_focus của category đã chọn
-  const selectedCategory = allCategories.find(cat => cat.id.toString() === categoryId);
-  const isListeningCategory = selectedCategory?.skill_focus === 'listening';
-
   // --- HÀM SUBMIT ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -381,229 +380,273 @@ const AdminQuizFormPage: React.FC = () => {
           {isEditMode ? 'Chỉnh sửa Đề thi' : 'Thêm Đề thi mới'}
         </Typography>
 
-        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
-          {/* Grid Container */}
-          <Grid container spacing={2}>
-            {/* Title */}
-            <Grid item xs={12}>
-              <TextField label="Tiêu đề Đề thi (*)" fullWidth required value={title}
-                onChange={(e) => setTitle(e.target.value)} disabled={isSaving}
-              />
-            </Grid>
-            {/* Category */}
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth required disabled={isSaving}>
-                <InputLabel id="category-select-label">Chủ đề (*)</InputLabel>
-                <MuiSelect // Sử dụng MuiSelect đã đổi tên
-                  labelId="category-select-label" id="category-select" value={categoryId}
-                  label="Chủ đề (*)" onChange={handleCategoryChange}
-                >
-                  {allCategories.map(cat => <MenuItem key={cat.id} value={cat.id.toString()}>{cat.name}</MenuItem>)}
-                </MuiSelect>
-              </FormControl>
-            </Grid>
-            {/* Time Limit */}
-            <Grid item xs={12} sm={6}>
-              <TextField label="Thời gian làm bài (phút, bỏ trống nếu không giới hạn)" fullWidth type="number"
-                value={timeLimit}
-                InputProps={{ inputProps: { min: 1 } }} // Đặt min cho input number
-                onChange={(e) => setTimeLimit(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                disabled={isSaving}
-              />
-            </Grid>
-            {/* Description */}
-             <Grid item xs={12}>
-              <TextField label="Mô tả (tùy chọn)" fullWidth multiline rows={3} value={description}
-                onChange={(e) => setDescription(e.target.value)} disabled={isSaving}
-              />
-            </Grid>
-            {/* Asset URL - Chỉ hiển thị khi chọn chủ đề Listening */}
-            {isListeningCategory && (
-              <Grid item xs={12}>
-                <FileUploadField
-                  value={assetUrl}
-                  onChange={setAssetUrl}
+        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3, display: 'grid', gap: 3 }}>
+          {/* Khối: Thông tin đề thi */}
+          <Box sx={{ p: 2.5, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
+              Thông tin đề thi
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  label="Tiêu đề Đề thi (*)"
+                  fullWidth
+                  required
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
                   disabled={isSaving}
-                  label="File đính kèm (Audio/Image)"
-                  helperText="Nhập URL file audio hoặc hình ảnh cho đề thi Listening, hoặc chọn file từ máy tính"
                 />
               </Grid>
-            )}
-            {/* Select Questions - Tab để chuyển đổi giữa chọn và nhập */}
-             <Grid item xs={12}>
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Quản lý câu hỏi (*)
-                  </Typography>
-                  <Tabs 
-                    value={questionMode} 
-                    onChange={(_, newValue) => setQuestionMode(newValue)}
-                    sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <FormControl fullWidth required disabled={isSaving}>
+                  <InputLabel id="category-select-label">Chủ đề (*)</InputLabel>
+                  <MuiSelect
+                    labelId="category-select-label"
+                    id="category-select"
+                    value={categoryId}
+                    label="Chủ đề (*)"
+                    onChange={handleCategoryChange}
                   >
-                    <Tab label="Chọn từ bộ câu hỏi" value="select" />
-                    <Tab label="Nhập hàng loạt" value="import" />
-                  </Tabs>
-                </Box>
+                    {allCategories.map((cat) => (
+                      <MenuItem key={cat.id} value={cat.id.toString()}>
+                        {cat.name}
+                      </MenuItem>
+                    ))}
+                  </MuiSelect>
+                  <FormHelperText>Chỉ hiển thị câu hỏi có cùng kỹ năng với chủ đề.</FormHelperText>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  label="Thời gian làm bài (phút, bỏ trống nếu không giới hạn)"
+                  fullWidth
+                  type="number"
+                  value={timeLimit}
+                  InputProps={{ inputProps: { min: 1 } }}
+                  onChange={(e) => setTimeLimit(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                  disabled={isSaving}
+                />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  label="Mô tả (tùy chọn)"
+                  fullWidth
+                  multiline
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  disabled={isSaving}
+                />
+              </Grid>
+            </Grid>
+          </Box>
 
-                {/* Tab: Chọn từ bộ câu hỏi */}
-                {questionMode === 'select' && (
-                  <FormControl fullWidth>
-                    <Select
-                      isMulti
-                      options={questionOptions}
-                      value={selectedQuestions}
-                      onChange={(selected) => setSelectedQuestions(selected)}
-                      placeholder="Tìm kiếm và chọn câu hỏi..."
-                      isLoading={isLoading}
-                      closeMenuOnSelect={false}
-                      isDisabled={isSaving}   
-                    />
-                    <FormHelperText>
-                      Thứ tự câu hỏi trong đề thi sẽ theo thứ tự bạn chọn ở đây. 
-                      Hiện đã chọn: {selectedQuestions.length} câu hỏi
-                    </FormHelperText>
-                  </FormControl>
-                )}
+          {/* Khối: File đính kèm (chỉ hiện nếu listening) */}
+          {isListeningCategory && (
+            <Box sx={{ p: 2.5, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                File đính kèm (Audio/Image) cho Listening
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Nhập URL file audio/hình ảnh hoặc tải trực tiếp từ máy tính.
+              </Typography>
+              <FileUploadField
+                value={assetUrl}
+                onChange={setAssetUrl}
+                disabled={isSaving}
+                label="File đính kèm (Audio/Image)"
+                helperText="Nếu là Listening, bạn cần cung cấp audio hoặc hình minh họa."
+              />
+            </Box>
+          )}
 
-                {/* Tab: Nhập hàng loạt */}
-                {questionMode === 'import' && (
-                  <Box>
-                    <Alert severity="info" sx={{ mb: 2 }}>
-                      <Typography variant="body2">
-                        Nhập câu hỏi theo định dạng sau, sau khi nhập xong các câu hỏi sẽ tự động được thêm vào đề thi:
-                      </Typography>
-                      <pre style={{ marginTop: 8, marginBottom: 0, fontSize: '0.9em' }}>
+          {/* Khối: Quản lý câu hỏi */}
+          <Box sx={{ p: 2.5, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+              Quản lý câu hỏi (*)
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Thứ tự câu hỏi trong đề thi sẽ theo thứ tự bạn chọn ở đây. Hiện đã chọn: {selectedQuestions.length} câu hỏi.
+            </Typography>
+            <Tabs
+              value={questionMode}
+              onChange={(_, newValue) => setQuestionMode(newValue)}
+              sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
+            >
+              <Tab label="Chọn từ bộ câu hỏi" value="select" />
+              <Tab label="Nhập hàng loạt" value="import" />
+            </Tabs>
+
+            {/* Tab: Chọn từ bộ câu hỏi */}
+            {questionMode === 'select' && (
+              <FormControl fullWidth>
+                <Select
+                  isMulti
+                  options={questionOptions}
+                  value={selectedQuestions}
+                  onChange={(selected) => setSelectedQuestions(selected)}
+                  placeholder="Tìm kiếm và chọn câu hỏi..."
+                  isLoading={isLoading}
+                  closeMenuOnSelect={false}
+                  isDisabled={isSaving}
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      minHeight: '48px',
+                      borderColor: '#c4c4c4',
+                    }),
+                  }}
+                />
+                <FormHelperText>
+                  Danh sách lọc theo kỹ năng của chủ đề. Bạn có thể chọn nhiều câu hỏi cùng lúc.
+                </FormHelperText>
+              </FormControl>
+            )}
+
+            {/* Tab: Nhập hàng loạt */}
+            {questionMode === 'import' && (
+              <Box>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  <Typography variant="body2">
+                    Nhập câu hỏi theo định dạng sau, sau khi nhập xong các câu hỏi sẽ tự động được thêm vào đề thi:
+                  </Typography>
+                  <pre style={{ marginTop: 8, marginBottom: 0, fontSize: '0.9em' }}>
 {`101. The car ______ to my uncle.
 A. belongs
 B. are belonging
 C. belong
 D. belonging`}
-                      </pre>
-                    </Alert>
+                  </pre>
+                </Alert>
 
-                    <Grid container spacing={2} sx={{ mb: 2 }}>
-                      <Grid item xs={12} sm={6}>
-                        <FormControl fullWidth>
-                          <InputLabel id="import-skill-label">Kỹ năng</InputLabel>
-                          <MuiSelect
-                            labelId="import-skill-label"
-                            id="import-skill-select"
-                            value={importSkillFocus}
-                            label="Kỹ năng"
-                            onChange={(e) => setImportSkillFocus(e.target.value as any)}
-                          >
-                            <MenuItem value="reading">Reading</MenuItem>
-                            <MenuItem value="listening">Listening</MenuItem>
-                            <MenuItem value="speaking">Speaking</MenuItem>
-                            <MenuItem value="writing">Writing</MenuItem>
-                          </MuiSelect>
-                        </FormControl>
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <Button
-                          variant="outlined"
-                          onClick={handleParse}
-                          disabled={!importTextInput.trim()}
-                          fullWidth
-                          sx={{ height: '56px' }}
-                        >
-                          Phân tích câu hỏi
-                        </Button>
-                      </Grid>
-                    </Grid>
-
-                    <TextField
+                <Grid container spacing={2} sx={{ mb: 2 }}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <FormControl fullWidth>
+                      <InputLabel id="import-skill-label">Kỹ năng</InputLabel>
+                      <MuiSelect
+                        labelId="import-skill-label"
+                        id="import-skill-select"
+                        value={importSkillFocus}
+                        label="Kỹ năng"
+                        onChange={(e) => setImportSkillFocus(e.target.value as any)}
+                      >
+                        <MenuItem value="reading">Reading</MenuItem>
+                        <MenuItem value="listening">Listening</MenuItem>
+                        <MenuItem value="speaking">Speaking</MenuItem>
+                        <MenuItem value="writing">Writing</MenuItem>
+                      </MuiSelect>
+                    </FormControl>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Button
+                      variant="outlined"
+                      onClick={handleParse}
+                      disabled={!importTextInput.trim()}
                       fullWidth
-                      multiline
-                      rows={8}
-                      label="Nhập nội dung câu hỏi"
-                      placeholder="Dán nội dung câu hỏi vào đây..."
-                      value={importTextInput}
-                      onChange={(e) => setImportTextInput(e.target.value)}
-                      sx={{ fontFamily: 'monospace', fontSize: '0.9em', mb: 2 }}
-                    />
+                      sx={{ height: '56px' }}
+                    >
+                      Phân tích câu hỏi
+                    </Button>
+                  </Grid>
+                </Grid>
 
-                    {parsedQuestions.length > 0 && (
-                      <>
-                        <Divider sx={{ my: 2 }} />
-                        <Alert severity="warning" sx={{ mb: 2 }}>
-                          Vui lòng click vào đáp án đúng cho từng câu hỏi trước khi nhập.
-                        </Alert>
-                        <Box sx={{ maxHeight: '300px', overflowY: 'auto', mb: 2 }}>
-                          {parsedQuestions.map((q, qIdx) => (
-                            <Card key={qIdx} sx={{ mb: 1.5 }}>
-                              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                                <Box sx={{ display: 'flex', alignItems: 'start', mb: 1 }}>
-                                  <Chip 
-                                    label={`Câu ${q.questionNumber || qIdx + 1}`} 
-                                    color="primary" 
-                                    size="small" 
-                                    sx={{ mr: 1 }}
-                                  />
-                                  <Typography variant="body2" sx={{ flex: 1, fontSize: '0.875rem' }}>
-                                    {q.questionText}
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={8}
+                  label="Nhập nội dung câu hỏi"
+                  placeholder="Dán nội dung câu hỏi vào đây..."
+                  value={importTextInput}
+                  onChange={(e) => setImportTextInput(e.target.value)}
+                  sx={{ fontFamily: 'monospace', fontSize: '0.9em', mb: 2 }}
+                />
+
+                {parsedQuestions.length > 0 && (
+                  <>
+                    <Divider sx={{ my: 2 }} />
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                      Vui lòng click vào đáp án đúng cho từng câu hỏi trước khi nhập.
+                    </Alert>
+                    <Box sx={{ maxHeight: '300px', overflowY: 'auto', mb: 2 }}>
+                      {parsedQuestions.map((q, qIdx) => (
+                        <Card key={qIdx} sx={{ mb: 1.5 }}>
+                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                            <Box sx={{ display: 'flex', alignItems: 'start', mb: 1 }}>
+                              <Chip
+                                label={`Câu ${q.questionNumber || qIdx + 1}`}
+                                color="primary"
+                                size="small"
+                                sx={{ mr: 1 }}
+                              />
+                              <Typography variant="body2" sx={{ flex: 1, fontSize: '0.875rem' }}>
+                                {q.questionText}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ mt: 1 }}>
+                              {q.options.map((opt, optIdx) => (
+                                <Box
+                                  key={optIdx}
+                                  sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    p: 0.75,
+                                    mb: 0.5,
+                                    cursor: 'pointer',
+                                    borderRadius: 1,
+                                    bgcolor: opt.isCorrect ? 'success.light' : 'transparent',
+                                    '&:hover': { bgcolor: 'action.hover' }
+                                  }}
+                                  onClick={() => handleToggleCorrect(qIdx, optIdx)}
+                                >
+                                  {opt.isCorrect ? (
+                                    <CheckCircleIcon color="success" sx={{ mr: 1, fontSize: '1rem' }} />
+                                  ) : (
+                                    <CancelIcon color="disabled" sx={{ mr: 1, fontSize: '1rem' }} />
+                                  )}
+                                  <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                                    <strong>{opt.label}.</strong> {opt.text}
                                   </Typography>
                                 </Box>
-                                <Box sx={{ mt: 1 }}>
-                                  {q.options.map((opt, optIdx) => (
-                                    <Box
-                                      key={optIdx}
-                                      sx={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        p: 0.75,
-                                        mb: 0.5,
-                                        cursor: 'pointer',
-                                        borderRadius: 1,
-                                        bgcolor: opt.isCorrect ? 'success.light' : 'transparent',
-                                        '&:hover': { bgcolor: 'action.hover' }
-                                      }}
-                                      onClick={() => handleToggleCorrect(qIdx, optIdx)}
-                                    >
-                                      {opt.isCorrect ? (
-                                        <CheckCircleIcon color="success" sx={{ mr: 1, fontSize: '1rem' }} />
-                                      ) : (
-                                        <CancelIcon color="disabled" sx={{ mr: 1, fontSize: '1rem' }} />
-                                      )}
-                                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                                        <strong>{opt.label}.</strong> {opt.text}
-                                      </Typography>
-                                    </Box>
-                                  ))}
-                                </Box>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </Box>
-                        <Button
-                          variant="contained"
-                          color="success"
-                          fullWidth
-                          onClick={handleImportAndAdd}
-                          disabled={
-                            isImporting || 
-                            !categoryId || 
-                            parsedQuestions.some(q => !q.options.some(opt => opt.isCorrect))
-                          }
-                          startIcon={isImporting ? <CircularProgress size={20} color="inherit" /> : null}
-                        >
-                          {isImporting ? 'Đang nhập...' : `Nhập và thêm ${parsedQuestions.length} câu hỏi vào đề thi`}
-                        </Button>
-                        {parsedQuestions.some(q => !q.options.some(opt => opt.isCorrect)) && (
-                          <Alert severity="error" sx={{ mt: 1 }}>
-                            Vui lòng đánh dấu đáp án đúng cho tất cả các câu hỏi.
-                          </Alert>
-                        )}
-                      </>
+                              ))}
+                            </Box>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </Box>
+                    <Button
+                      variant="contained"
+                      color="success"
+                      fullWidth
+                      onClick={handleImportAndAdd}
+                      disabled={
+                        isImporting ||
+                        !categoryId ||
+                        parsedQuestions.some((q) => !q.options.some((opt) => opt.isCorrect))
+                      }
+                      startIcon={isImporting ? <CircularProgress size={20} color="inherit" /> : null}
+                    >
+                      {isImporting ? 'Đang nhập...' : `Nhập và thêm ${parsedQuestions.length} câu hỏi vào đề thi`}
+                    </Button>
+                    {parsedQuestions.some((q) => !q.options.some((opt) => opt.isCorrect)) && (
+                      <Alert severity="error" sx={{ mt: 1 }}>
+                        Vui lòng đánh dấu đáp án đúng cho tất cả các câu hỏi.
+                      </Alert>
                     )}
-                  </Box>
+                  </>
                 )}
-             </Grid>
-          </Grid>
+              </Box>
+            )}
+          </Box>
+
           {/* Nút bấm */}
-          <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-            <Button type="submit" variant="contained" disabled={isSaving} startIcon={isSaving ? <CircularProgress size={20} color="inherit" /> : null}>
-              {isSaving ? 'Đang lưu...' : (isEditMode ? 'Lưu thay đổi' : 'Tạo đề thi')}
+          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-start' }}>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={isSaving}
+              startIcon={isSaving ? <CircularProgress size={20} color="inherit" /> : null}
+            >
+              {isSaving ? 'Đang lưu...' : isEditMode ? 'Lưu thay đổi' : 'Tạo đề thi'}
             </Button>
             <Button type="button" variant="outlined" onClick={() => navigate('/admin/quizzes')} disabled={isSaving}>
               Hủy

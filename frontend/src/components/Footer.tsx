@@ -39,7 +39,7 @@ const Footer: React.FC = () => {
         <Grid container spacing={4} justifyContent="space-between">
           
           {/* CỘT 1: GIỚI THIỆU (Rộng hơn) */}
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <Typography variant="h6" component="h3" gutterBottom sx={{ fontWeight: 700 }}>
               EPT Learning
             </Typography>
@@ -75,7 +75,7 @@ const Footer: React.FC = () => {
           </Grid>
 
           {/* CỘT 2: LIÊN KẾT */}
-          <Grid item xs={6} sm={3} md={2}>
+          <Grid size={{ xs: 6, sm: 3, md: 2 }}>
             <Typography variant="overline" component="h4" gutterBottom sx={{ fontWeight: 700 }}>
               Liên kết
             </Typography>
@@ -89,7 +89,7 @@ const Footer: React.FC = () => {
           </Grid>
 
           {/* CỘT 3: HỖ TRỢ */}
-          <Grid item xs={6} sm={3} md={2}>
+          <Grid size={{ xs: 6, sm: 3, md: 2 }}>
             <Typography variant="overline" component="h4" gutterBottom sx={{ fontWeight: 700 }}>
               Hỗ trợ
             </Typography>
@@ -100,7 +100,7 @@ const Footer: React.FC = () => {
           </Grid>
 
           {/* CỘT 4: THÔNG TIN */}
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <Typography variant="overline" component="h4" gutterBottom sx={{ fontWeight: 700 }}>
               Thông tin
             </Typography>

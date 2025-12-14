@@ -43,11 +43,16 @@ const QuizResultsPage: React.FC = () => {
         setError(null);
         // Gọi API Lịch sử (history) mà chúng ta đã tạo
         const response = await api.get<AttemptDetails>(`/api/history/attempts/${attemptId}`);
-        setAttempt(response.data);
-      } catch (err: any)
- {
+        console.log("API Response:", response.data);
+        if (response.data) {
+          setAttempt(response.data);
+        } else {
+          setError('Dữ liệu trả về không hợp lệ.');
+        }
+      } catch (err: any) {
         console.error("Lỗi khi tải kết quả:", err);
-        setError(err.response?.data?.message || 'Không thể tải kết quả bài làm.');
+        console.error("Error details:", err.response?.data || err.message);
+        setError(err.response?.data?.message || err.message || 'Không thể tải kết quả bài làm.');
       } finally {
         setIsLoading(false);
       }
@@ -255,11 +260,11 @@ const QuizResultsPage: React.FC = () => {
   }
 
   return (
-    <Box>
-      <Typography variant="h4" component="h1">Kết quả: {attempt.quiz_title}</Typography>
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" component="h1">Kết quả: {attempt.quiz_title || 'N/A'}</Typography>
       {/* Thẻ điểm tổng kết */}
       <Alert severity="success" icon={<CheckCircleIcon fontSize="inherit" />} sx={{ mt: 2, fontSize: '1.2rem' }}>
-        <strong>Điểm tổng kết: {attempt.final_score}%</strong>
+        <strong>Điểm tổng kết: {attempt.final_score || 0}%</strong>
       </Alert>
       
       <Box sx={{ my: 3, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
@@ -289,7 +294,13 @@ const QuizResultsPage: React.FC = () => {
       <Typography variant="h5" sx={{ mt: 3, mb: 2 }}>Xem lại chi tiết:</Typography>
       {/* Hiển thị danh sách câu hỏi review */}
       <Box>
-        {attempt.results.map(renderResultItem)}
+        {attempt.results && attempt.results.length > 0 ? (
+          attempt.results.map(renderResultItem)
+        ) : (
+          <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
+            Chưa có dữ liệu kết quả để hiển thị.
+          </Typography>
+        )}
       </Box>
     </Box>
   );

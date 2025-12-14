@@ -186,7 +186,7 @@ const AdminQuestionImportPage: React.FC = () => {
           navigate('/admin/questions');
         }, 2000);
       } else {
-        toast.warning(`Đã nhập ${response.data.results.success.length} câu hỏi. ${response.data.results.failed.length} câu hỏi thất bại.`);
+        toast(`Đã nhập ${response.data.results.success.length} câu hỏi. ${response.data.results.failed.length} câu hỏi thất bại.`, { icon: '⚠️' });
       }
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Lỗi khi nhập câu hỏi.');
@@ -247,7 +247,7 @@ D. though`}
         </Alert>
 
         <Grid container spacing={3}>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <FormControl fullWidth required>
               <InputLabel id="category-label">Chủ đề</InputLabel>
               <Select
@@ -265,7 +265,7 @@ D. though`}
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <FormControl fullWidth required>
               <InputLabel id="skill-label">Kỹ năng</InputLabel>
               <Select
@@ -283,7 +283,7 @@ D. though`}
             </FormControl>
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <TextField
               fullWidth
               multiline
@@ -296,7 +296,7 @@ D. though`}
             />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Button
               variant="contained"
               startIcon={<UploadFileIcon />}

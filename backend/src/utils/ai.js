@@ -37,33 +37,135 @@ function getModel(modelName) {
       temperature: 0.4, // Lower for more consistent grading
       topP: 0.95,
       topK: 40,
-      maxOutputTokens: 4096, // Increased for detailed feedback
+      maxOutputTokens: 8192, // Increased to prevent response truncation
     }
   });
 }
 
-// --- JSON Parser ---
+// --- JSON Parser (Improved) ---
 function extractJsonObject(raw) {
   try {
-    const trimmed = raw.trim();
+    let trimmed = raw.trim();
     
-    // Try markdown fence
-    const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-    if (fenceMatch) {
-      return JSON.parse(fenceMatch[1].trim());
+    // Remove markdown fence if present
+    if (trimmed.startsWith('```')) {
+      // Remove opening fence
+      trimmed = trimmed.replace(/^```(?:json)?\s*/i, '');
+      // Remove closing fence
+      trimmed = trimmed.replace(/\s*```\s*$/i, '');
+      trimmed = trimmed.trim();
     }
     
     // Try to find JSON object
+    let jsonStr = trimmed;
     const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      jsonStr = jsonMatch[0];
     }
     
-    // Direct parse
-    return JSON.parse(trimmed);
+    // Fix common JSON errors
+    // Fix trailing commas in arrays/objects
+    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+    
+    // Try to fix incomplete JSON (if response was cut off)
+    // Count braces and brackets to see if JSON is incomplete
+    let openBraces = (jsonStr.match(/\{/g) || []).length;
+    let closeBraces = (jsonStr.match(/\}/g) || []).length;
+    let openBrackets = (jsonStr.match(/\[/g) || []).length;
+    let closeBrackets = (jsonStr.match(/\]/g) || []).length;
+    
+    // If JSON seems incomplete, try to close it
+    if (openBraces > closeBraces || openBrackets > closeBrackets) {
+      // Close incomplete arrays first
+      while (openBrackets > closeBrackets) {
+        jsonStr += ']';
+        closeBrackets++;
+      }
+      
+      // Close incomplete objects
+      while (openBraces > closeBraces) {
+        jsonStr += '}';
+        closeBraces++;
+      }
+      
+      // Remove trailing comma before closing
+      jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+    }
+    
+    // Try parsing
+    try {
+      return JSON.parse(jsonStr);
+    } catch (parseError) {
+      // If still fails, try to extract balanced JSON
+      let braceCount = 0;
+      let bracketCount = 0;
+      let startIdx = -1;
+      let endIdx = -1;
+      let inString = false;
+      let escapeNext = false;
+      
+      for (let i = 0; i < jsonStr.length; i++) {
+        const char = jsonStr[i];
+        
+        if (escapeNext) {
+          escapeNext = false;
+          continue;
+        }
+        
+        if (char === '\\') {
+          escapeNext = true;
+          continue;
+        }
+        
+        if (char === '"' && !escapeNext) {
+          inString = !inString;
+          continue;
+        }
+        
+        if (inString) continue;
+        
+        if (char === '{') {
+          if (startIdx === -1) startIdx = i;
+          braceCount++;
+        } else if (char === '}') {
+          braceCount--;
+          if (braceCount === 0 && startIdx !== -1) {
+            endIdx = i;
+            break;
+          }
+        } else if (char === '[') {
+          bracketCount++;
+        } else if (char === ']') {
+          bracketCount--;
+        }
+      }
+      
+      if (startIdx !== -1 && endIdx !== -1) {
+        const balancedJson = jsonStr.substring(startIdx, endIdx + 1);
+        // Fix trailing commas again
+        const fixedJson = balancedJson.replace(/,(\s*[}\]])/g, '$1');
+        return JSON.parse(fixedJson);
+      }
+      
+      throw parseError;
+    }
   } catch (error) {
     console.error("❌ Parse Error:", error.message);
-    console.error("📄 Raw (500 chars):", raw.substring(0, 500));
+    console.error("📄 Raw response length:", raw.length);
+    console.error("📄 Raw (first 1000 chars):", raw.substring(0, 1000));
+    console.error("📄 Raw (last 500 chars):", raw.substring(Math.max(0, raw.length - 500)));
+    
+    // Try to find the problematic position
+    if (error.message.includes('position')) {
+      const posMatch = error.message.match(/position (\d+)/);
+      if (posMatch) {
+        const pos = parseInt(posMatch[1]);
+        const start = Math.max(0, pos - 100);
+        const end = Math.min(raw.length, pos + 100);
+        console.error(`📄 Around error position ${pos}:`, raw.substring(start, end));
+      }
+    }
+    
     throw new Error(`JSON parse failed: ${error.message}`);
   }
 }
@@ -207,14 +309,27 @@ export const gradeWriting = async (questionPrompt, userEssay) => {
     const model = getModel(EVAL_MODEL_NAME);
     console.log("      ✓ Model ready");
     
-    const systemPrompt = `You are an expert EPT English writing examiner with a Master's degree in Applied Linguistics.
+    const systemPrompt = `Bạn là một giám khảo rất nghiêm khắc về viết tiếng Anh với bằng Thạc sĩ Ngôn ngữ tiếng anh. Bạn phải đánh giá khách quan, không khoan nhượng, và phát hiện mọi lỗi dù nhỏ nhất.
 
-Evaluate this essay using a comprehensive rubric (0-100 scale for each criterion).
+Đánh giá bài viết này sử dụng rubric toàn diện (thang điểm 0-100 cho mỗi tiêu chí) với tiêu chuẩn cao. Bạn phải:
+- Phát hiện và trừ điểm cho tất cả các lỗi ngữ pháp, dù nhỏ
+- Đánh giá từ vựng một cách khắt khe, không chấp nhận từ không chính xác hoặc không phù hợp
+- Yêu cầu mạch lạc và liên kết rõ ràng, trừ điểm cho mọi sự thiếu logic
+- Đánh giá nghiêm ngặt việc hoàn thành nhiệm vụ, không khoan nhượng cho phần thiếu sót
+- Yêu cầu tổ chức chặt chẽ, trừ điểm cho cấu trúc lỏng lẻo
 
-Return ONLY this JSON structure:
+Không được quá khoan dung. Điểm số phải phản ánh dúng chất lượng thực tế của bài viết.
+
+Quan trọng: Bạn phải trả về chỉ json hợp lệ, không có văn bản nào khác. Json phải:
+- Không có dấu phẩy thừa (trailing commas)
+- Tất cả các mảng và object phải được đóng đúng cách
+- Tất cả các chuỗi phải được đặt trong dấu ngoặc kép
+- Không có markdown code fences, không có giải thích
+
+Chỉ trả về cấu trúc json này:
 {
   "score": 75,
-  "feedback": "Comprehensive 3-4 sentence overall feedback",
+  "feedback": "Phản hồi tổng quan 3-4 câu toàn diện, chỉ ra rõ ràng các điểm yếu",
   "details": {
     "grammar": 70,
     "vocabulary": 80,
@@ -222,93 +337,155 @@ Return ONLY this JSON structure:
     "task_achievement": 78,
     "organization": 72
   },
-  "strengths": ["specific strength 1", "specific strength 2", "specific strength 3"],
-  "improvements": ["specific issue 1 with example", "specific issue 2 with example"],
+  "strengths": ["điểm mạnh cụ thể 1", "điểm mạnh cụ thể 2", "điểm mạnh cụ thể 3"],
+  "improvements": ["vấn đề cụ thể 1 kèm ví dụ", "vấn đề cụ thể 2 kèm ví dụ"],
   "grammarErrors": [
-    {"error": "exact phrase from essay", "correction": "corrected phrase", "explanation": "why"}
+    {"error": "cụm từ chính xác từ bài viết", "correction": "cụm từ đã sửa", "explanation": "lý do"}
   ],
   "vocabularyIssues": [
-    {"word": "problematic word", "suggestion": "better alternative", "reason": "why"}
+    {"word": "từ có vấn đề", "suggestion": "lựa chọn tốt hơn", "reason": "lý do"}
   ],
-  "recommendations": ["actionable tip 1", "actionable tip 2", "actionable tip 3"]
+  "recommendations": ["lời khuyên hành động 1", "lời khuyên hành động 2", "lời khuyên hành động 3"]
 }
 
-Detailed Rubric (each 0-100):
+Rubric Chi Tiết (mỗi tiêu chí 0-100):
 
-GRAMMAR (0-100):
-- 90-100: Near-perfect grammar, complex structures used correctly
-- 80-89: Very good, minor errors that don't impede communication
-- 70-79: Good control, some errors in complex structures
-- 60-69: Adequate, noticeable errors but meaning is clear
-- 50-59: Limited control, frequent errors affecting clarity
-- Below 50: Poor control, pervasive errors
+NGỮ PHÁP (GRAMMAR) (0-100):
+- 90-100: Gần như hoàn hảo, sử dụng đúng các cấu trúc phức tạp
+- 80-89: Rất tốt, có lỗi nhỏ không ảnh hưởng đến giao tiếp
+- 70-79: Kiểm soát tốt, có một số lỗi trong cấu trúc phức tạp
+- 60-69: Đạt yêu cầu, có lỗi đáng chú ý nhưng ý nghĩa vẫn rõ ràng
+- 50-59: Kiểm soát hạn chế, lỗi thường xuyên ảnh hưởng đến sự rõ ràng
+- Dưới 50: Kiểm soát kém, lỗi lan tỏa
 
-VOCABULARY (0-100):
-- 90-100: Sophisticated, precise word choice, varied expressions
-- 80-89: Very good range, appropriate use of advanced vocabulary
-- 70-79: Good range, some advanced vocabulary with minor inaccuracies
-- 60-69: Adequate range, relies on common words, some repetition
-- 50-59: Limited range, frequent repetition, word choice errors
-- Below 50: Very limited vocabulary
+TỪ VỰNG (VOCABULARY) (0-100):
+- 90-100: Tinh tế, lựa chọn từ chính xác, đa dạng cách diễn đạt
+- 80-89: Phạm vi rất tốt, sử dụng từ vựng nâng cao phù hợp
+- 70-79: Phạm vi tốt, có một số từ vựng nâng cao với sai sót nhỏ
+- 60-69: Phạm vi đạt yêu cầu, dựa vào từ thông dụng, có lặp lại
+- 50-59: Phạm vi hạn chế, lặp lại thường xuyên, lỗi lựa chọn từ
+- Dưới 50: Từ vựng rất hạn chế
 
-COHERENCE & COHESION (0-100):
-- 90-100: Excellent flow, perfect use of cohesive devices
-- 80-89: Very good logical flow, appropriate linking
-- 70-79: Good organization, adequate linking with minor issues
-- 60-69: Adequate organization, some awkward transitions
-- 50-59: Limited coherence, unclear progression
-- Below 50: Lacks clear organization
+MẠCH LẠC VÀ LIÊN KẾT (COHERENCE & COHESION) (0-100):
+- 90-100: Luồng xuất sắc, sử dụng hoàn hảo các phương tiện liên kết
+- 80-89: Luồng logic rất tốt, liên kết phù hợp
+- 70-79: Tổ chức tốt, liên kết đầy đủ với vấn đề nhỏ
+- 60-69: Tổ chức đạt yêu cầu, một số chuyển tiếp vụng về
+- 50-59: Mạch lạc hạn chế, tiến trình không rõ ràng
+- Dưới 50: Thiếu tổ chức rõ ràng
 
-TASK ACHIEVEMENT (0-100):
-- 90-100: Fully addresses all parts, highly developed ideas
-- 80-89: Addresses all parts well, clear position throughout
-- 70-79: Addresses task, some parts more developed than others
-- 60-69: Addresses task but with limited development
-- 50-59: Minimally addresses task, lacks development
-- Below 50: Does not adequately address task
+HOÀN THÀNH NHIỆM VỤ (TASK ACHIEVEMENT) (0-100) - QUAN TRỌNG: Đánh giá nghiêm ngặt về việc bài viết có phù hợp với đề bài:
+- 90-100: Hoàn toàn phù hợp với đề bài, trả lời đầy đủ tất cả yêu cầu, ý tưởng phát triển cao
+- 80-89: Phù hợp tốt với đề bài, trả lời đầy đủ các yêu cầu, quan điểm rõ ràng xuyên suốt
+- 70-79: Phù hợp với đề bài, trả lời được nhiệm vụ nhưng một số phần phát triển hơn phần khác
+- 60-69: Có phù hợp nhưng chưa đầy đủ, trả lời được nhiệm vụ nhưng phát triển hạn chế
+- 50-59: Phù hợp tối thiểu, chỉ trả lời được một phần nhỏ của đề bài, thiếu phát triển
+- Dưới 50: Không phù hợp với đề bài, lạc đề hoặc không trả lời được yêu cầu của đề
 
-ORGANIZATION (0-100):
-- 90-100: Perfect structure, clear paragraphing
-- 80-89: Very well organized with clear structure
-- 70-79: Good organization, logical paragraphing
-- 60-69: Adequate structure, some organizational issues
-- 50-59: Limited organization, unclear structure
-- Below 50: Poor organization
+LƯU Ý ĐẶC BIỆT: Bạn phải kiểm tra kỹ:
+- Bài viết có trả lời đúng câu hỏi/đề bài không?
+- Nội dung có liên quan trực tiếp đến đề bài không?
+- Có bị lạc đề hay viết về chủ đề khác không?
+- Có đáp ứng đầy đủ các yêu cầu trong đề bài không?
+Nếu bài viết lạc đề hoặc không phù hợp, điểm Task Achievement phải thấp (dưới 50).
 
-Final score = average of all criteria.`;
+TỔ CHỨC (ORGANIZATION) (0-100):
+- 90-100: Cấu trúc hoàn hảo, phân đoạn rõ ràng
+- 80-89: Tổ chức rất tốt với cấu trúc rõ ràng
+- 70-79: Tổ chức tốt, phân đoạn logic
+- 60-69: Cấu trúc đạt yêu cầu, một số vấn đề tổ chức
+- 50-59: Tổ chức hạn chế, cấu trúc không rõ ràng
+- Dưới 50: Tổ chức kém
 
-    const userPrompt = `QUESTION/PROMPT:
+[Rubric chi tiết cho 5 tiêu chí: Grammar, Vocabulary, Coherence, Task Achievement, Organization]
+
+Điểm cuối cùng = trung bình của tất cả các tiêu chí. Phải đảm bảo điểm số phản ánh đúng chất lượng, không được quá khoan dung.
+
+NHỚ: Trả về chỉ json hợp lệ, không có văn bản nào khác, không có markdown, không có giải thích.`;
+
+    const userPrompt = `CÂU HỎI/ĐỀ BÀI:
 ${questionPrompt}
 
-STUDENT'S ESSAY:
+BÀI VIẾT CỦA HỌC SINH:
 ${userEssay}
 
-Word count: ${userEssay.split(/\s+/).length} words
+Số từ: ${userEssay.split(/\s+/).length} từ
 
-Evaluate thoroughly using the rubric above. Return ONLY JSON.`;
+Đánh giá kỹ lưỡng sử dụng rubric ở trên. 
+
+QUAN TRỌNG ĐẶC BIỆT VỀ TASK ACHIEVEMENT:
+1. Đọc kỹ đề bài và xác định yêu cầu chính
+2. Kiểm tra xem bài viết có trả lời ĐÚNG câu hỏi/đề bài không
+3. Đánh giá xem nội dung có PHÙ HỢP và LIÊN QUAN trực tiếp đến đề bài không
+4. Nếu bài viết lạc đề, viết về chủ đề khác, hoặc không trả lời được yêu cầu → điểm Task Achievement PHẢI thấp (dưới 50)
+5. Nếu bài viết phù hợp nhưng chưa đầy đủ → điểm từ 50-69
+6. Nếu bài viết phù hợp và đầy đủ → điểm từ 70-100
+
+Trong phần "improvements", nếu bài viết không phù hợp với đề, bạn PHẢI chỉ ra rõ ràng:
+- "Bài viết không phù hợp với đề bài: [giải thích cụ thể]"
+- "Nội dung lạc đề: [chỉ ra phần nào lạc đề]"
+- "Thiếu trả lời yêu cầu: [liệt kê yêu cầu nào chưa được đáp ứng]"
+
+QUAN TRỌNG: CHỈ trả về JSON hợp lệ, không có văn bản nào khác. Đảm bảo:
+- Không có dấu phẩy thừa
+- Tất cả mảng và object được đóng đúng cách
+- JSON có thể parse được ngay lập tức`;
     
     console.log("\n[2/5] Sending to Gemini API...");
     console.log(`      Prompt: ${systemPrompt.length + userPrompt.length} chars`);
     
-    const result = await model.generateContent([
-      { text: systemPrompt },
-      { text: userPrompt }
-    ]);
-    console.log("      ✓ Response received");
+    // Retry logic for JSON parsing
+    let parsed = null;
+    let rawText = null;
+    const maxRetries = 2;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          console.log(`\n      ⚠️  Retry attempt ${attempt}/${maxRetries}...`);
+          // Add stricter instruction for retry
+          const retryPrompt = userPrompt + "\n\nCRITICAL: Your previous response had invalid JSON. Please return ONLY valid JSON with proper syntax. Ensure all arrays and objects are properly closed, all strings are properly quoted, and there are no trailing commas.";
+          const retryResult = await model.generateContent([
+            { text: systemPrompt },
+            { text: retryPrompt }
+          ]);
+          rawText = retryResult.response?.text();
+        } else {
+          const result = await model.generateContent([
+            { text: systemPrompt },
+            { text: userPrompt }
+          ]);
+          rawText = result.response?.text();
+        }
+        
+        console.log("      ✓ Response received");
 
-    const rawText = result.response?.text();
-    console.log("\n[3/5] Processing response...");
-    console.log(`      Length: ${rawText?.length || 0} chars`);
-    console.log(`      Preview: ${rawText?.substring(0, 150).replace(/\n/g, ' ')}...`);
+        console.log("\n[3/5] Processing response...");
+        console.log(`      Length: ${rawText?.length || 0} chars`);
+        console.log(`      Preview: ${rawText?.substring(0, 150).replace(/\n/g, ' ')}...`);
 
-    if (!rawText) {
-      throw new Error('Empty response from Gemini');
+        if (!rawText) {
+          throw new Error('Empty response from Gemini');
+        }
+
+        console.log("\n[4/5] Parsing JSON...");
+        parsed = extractJsonObject(rawText);
+        console.log("      ✓ JSON parsed successfully");
+        console.log(`      Score: ${parsed.score}`);
+        break; // Success, exit retry loop
+        
+      } catch (parseError) {
+        if (attempt === maxRetries) {
+          // Last attempt failed, throw error
+          console.error(`\n      ❌ All ${maxRetries + 1} attempts failed`);
+          throw parseError;
+        }
+        console.error(`\n      ⚠️  Parse failed on attempt ${attempt + 1}, will retry...`);
+        console.error(`      Error: ${parseError.message}`);
+        // Wait a bit before retry
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
     }
-
-    console.log("\n[4/5] Parsing JSON...");
-    const parsed = extractJsonObject(rawText);
-    console.log("      ✓ JSON parsed successfully");
-    console.log(`      Score: ${parsed.score}`);
     
     // Validate
     if (typeof parsed.score !== 'number') {

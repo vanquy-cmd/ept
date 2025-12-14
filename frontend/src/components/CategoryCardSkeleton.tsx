@@ -4,7 +4,7 @@ import { Grid, Card, CardContent, Skeleton, Box } from '@mui/material';
 const CategoryCardSkeleton: React.FC = () => {
   return (
     // Grid item giữ nguyên cấu trúc responsive
-    <Grid item xs={12} sm={6} md={4}>
+    <Grid size={{ xs: 12, sm: 6, md: 4 }}>
       <Card sx={{ height: '100%', display: 'flex' }}>
         <CardContent sx={{ width: '100%' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>

@@ -83,7 +83,7 @@ const QuestionRenderer: React.FC<QuestionRendererProps> = ({
           // Encode MP3 với lamejs
           const mp3encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, 128); // 128 kbps
           const sampleBlockSize = 1152;
-          const mp3Data: Int8Array[] = [];
+          const mp3Data: Uint8Array[] = [];
 
           // Encode từng block
           for (let i = 0; i < length; i += sampleBlockSize) {

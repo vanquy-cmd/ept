@@ -4,7 +4,6 @@ import api from '../../services/api';
 import type { VocabularySet, VocabularyWord, Category } from '../../types';
 import { toast } from 'react-hot-toast';
 
-import Alert from '@mui/material/Alert';
 import {
   TextField, Container, Select, MenuItem, FormControl, InputLabel,
   Paper, Button, IconButton, CircularProgress, Box, Typography,
@@ -133,12 +132,12 @@ const AdminVocabularyFormPage: React.FC = () => {
           <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
             <Typography variant="h6" gutterBottom>Thông tin Bộ Từ vựng</Typography>
             <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <TextField label="Tiêu đề Bộ (*)" fullWidth required value={title}
                   onChange={(e) => setTitle(e.target.value)} disabled={isSaving}
                 />
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <FormControl fullWidth disabled={isSaving}>
                   <InputLabel id="category-select-label">Chủ đề (tùy chọn)</InputLabel>
                   <Select labelId="category-select-label" id="category-select" value={categoryId} label="Chủ đề (tùy chọn)" onChange={handleCategoryChange}>
@@ -147,7 +146,7 @@ const AdminVocabularyFormPage: React.FC = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <TextField label="Mô tả (tùy chọn)" fullWidth multiline rows={2} value={description}
                   onChange={(e) => setDescription(e.target.value)} disabled={isSaving}
                 />
@@ -162,32 +161,32 @@ const AdminVocabularyFormPage: React.FC = () => {
               <Box key={wordState.tempId} sx={{ mb: 3, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
                  <Grid container spacing={2} alignItems="center">
                     {/* Từ & Loại từ */}
-                    <Grid item xs={12} sm={5}>
+                    <Grid size={{ xs: 12, sm: 5 }}>
                         <TextField label={`Từ #${index + 1} (*)`} fullWidth required size="small"
                            value={wordState.word || ''} onChange={(e) => handleWordChange(wordState.tempId, 'word', e.target.value)} disabled={isSaving}/>
                     </Grid>
-                     <Grid item xs={12} sm={4}>
+                     <Grid size={{ xs: 12, sm: 4 }}>
                         <TextField label="Loại từ" fullWidth size="small"
                            value={wordState.part_of_speech || ''} onChange={(e) => handleWordChange(wordState.tempId, 'part_of_speech', e.target.value)} disabled={isSaving}/>
                     </Grid>
                     {/* Nút xóa */}
-                    <Grid item xs={12} sm={3} sx={{ textAlign: 'right' }}>
+                    <Grid size={{ xs: 12, sm: 3 }} sx={{ textAlign: 'right' }}>
                        <IconButton aria-label="remove word" color="error" onClick={() => removeWord(wordState.tempId)} disabled={words.length <= 1 || isSaving}>
                             <RemoveCircleOutlineIcon />
                         </IconButton>
                     </Grid>
                      {/* Định nghĩa */}
-                     <Grid item xs={12}>
+                     <Grid size={{ xs: 12 }}>
                          <TextField label="Định nghĩa (*)" fullWidth required multiline rows={2} size="small"
                            value={wordState.definition || ''} onChange={(e) => handleWordChange(wordState.tempId, 'definition', e.target.value)} disabled={isSaving}/>
                     </Grid>
                     {/* Ví dụ */}
-                     <Grid item xs={12}>
+                     <Grid size={{ xs: 12 }}>
                          <TextField label="Câu ví dụ" fullWidth multiline rows={2} size="small"
                            value={wordState.example_sentence || ''} onChange={(e) => handleWordChange(wordState.tempId, 'example_sentence', e.target.value)} disabled={isSaving}/>
                     </Grid>
                     {/* Audio URL */}
-                    <Grid item xs={12}>
+                    <Grid size={{ xs: 12 }}>
                          <TextField label="URL Audio" fullWidth size="small"
                            value={wordState.audio_url || ''} onChange={(e) => handleWordChange(wordState.tempId, 'audio_url', e.target.value)} disabled={isSaving} placeholder="https://..."/>
                     </Grid>

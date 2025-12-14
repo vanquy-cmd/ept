@@ -147,7 +147,7 @@ const AdminCategoryListPage: React.FC = () => {
           startIcon={<AddIcon />}
           onClick={() => navigate('/admin/categories/new')}
         >
-          Thêm chủ đề mới
+          Thêm mới
         </Button>
       </Box>
 

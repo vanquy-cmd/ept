@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../services/api';
-import type { QuizSummary, Category } from '../../types'; // Import type
+import type { QuizSummary } from '../../types'; // Import type
 import { Link as RouterLink } from 'react-router-dom';
 import {
   Box, Typography, Card, CardActionArea, CardContent, 
-  CircularProgress, Alert, Chip, Stack, Button, ButtonGroup
+  CircularProgress, Alert, Chip, Stack
 } from '@mui/material';
 import TimerIcon from '@mui/icons-material/Timer';
 import CategoryIcon from '@mui/icons-material/Category';
@@ -13,23 +13,18 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 
 const PracticePage: React.FC = () => {
   const [quizzes, setQuizzes] = useState<QuizSummary[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Tải dữ liệu quizzes và categories
+  // Tải dữ liệu quizzes
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        const [quizzesRes, categoriesRes] = await Promise.all([
-          api.get<QuizSummary[]>('/api/quizzes'),
-          api.get<Category[]>('/api/learning/categories')
-        ]);
+        const quizzesRes = await api.get<QuizSummary[]>('/api/quizzes');
         setQuizzes(quizzesRes.data);
-        setCategories(categoriesRes.data);
       } catch (err: any) {
         console.error("Lỗi khi tải dữ liệu:", err);
         setError(err.response?.data?.message || 'Không thể tải dữ liệu.');

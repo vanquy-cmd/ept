@@ -94,69 +94,78 @@ const AdminCategoryFormPage: React.FC = () => {
   }
 
   return (
-    <Container component="main" maxWidth="md">
-      <Paper elevation={3} sx={{ mt: 4, p: 3 }}>
+    <Container component="main" maxWidth="md" sx={{ display: 'flex', justifyContent: 'center' }}>
+      <Paper elevation={3} sx={{ mt: 4, p: 3, width: '100%', maxWidth: 960 }}>
         <Typography component="h1" variant="h5" align="center" gutterBottom>
-          {isEditMode ? 'Chỉnh sửa Chủ đề' : 'Thêm Chủ đề mới'}
+          {isEditMode ? 'Chỉnh sửa Chủ đề' : 'Thêm chủ đề mới'}
         </Typography>
 
-        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
-          <Grid container spacing={2}>
-            {/* Name */}
-            <Grid item xs={12}>
-              <TextField
-                label="Tên chủ đề (*)"
-                fullWidth
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={isSaving}
-              />
-            </Grid>
+        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3, display: 'grid', gap: 3 }}>
+          <Box sx={{ p: 2.5, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+              Thông tin chủ đề
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Tên, mô tả và kỹ năng chính của chủ đề sẽ quyết định câu hỏi và đề thi liên quan.
+            </Typography>
+            <Grid container spacing={2}>
+              {/* Hàng 1: Tên chủ đề và Kỹ năng */}
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  label="Tên chủ đề (*)"
+                  fullWidth
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={isSaving}
+                />
+              </Grid>
 
-            {/* Description */}
-            <Grid item xs={12}>
-              <TextField
-                label="Mô tả (tùy chọn)"
-                fullWidth
-                multiline
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={isSaving}
-              />
-            </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <FormControl fullWidth required disabled={isSaving}>
+                  <InputLabel id="skill-focus-select-label">Kỹ năng (*)</InputLabel>
+                  <Select
+                    labelId="skill-focus-select-label"
+                    id="skill-focus-select"
+                    value={skillFocus}
+                    label="Kỹ năng (*)"
+                    onChange={handleSkillFocusChange}
+                  >
+                    <MenuItem value="listening">Nghe (Listening)</MenuItem>
+                    <MenuItem value="reading">Đọc (Reading)</MenuItem>
+                    <MenuItem value="speaking">Nói (Speaking)</MenuItem>
+                    <MenuItem value="writing">Viết (Writing)</MenuItem>
+                    <MenuItem value="general">Tổng hợp (General)</MenuItem>
+                  </Select>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.75, display: 'block' }}>
+                    Kỹ năng chính giúp lọc câu hỏi và đề thi phù hợp.
+                  </Typography>
+                </FormControl>
+              </Grid>
 
-            {/* Skill Focus */}
-            <Grid item xs={12}>
-              <FormControl fullWidth required disabled={isSaving}>
-                <InputLabel id="skill-focus-select-label">Kỹ năng (*)</InputLabel>
-                <Select
-                  labelId="skill-focus-select-label"
-                  id="skill-focus-select"
-                  value={skillFocus}
-                  label="Kỹ năng (*)"
-                  onChange={handleSkillFocusChange}
-                >
-                  <MenuItem value="listening">Nghe (Listening)</MenuItem>
-                  <MenuItem value="reading">Đọc (Reading)</MenuItem>
-                  <MenuItem value="speaking">Nói (Speaking)</MenuItem>
-                  <MenuItem value="writing">Viết (Writing)</MenuItem>
-                  <MenuItem value="general">Tổng hợp (General)</MenuItem>
-                </Select>
-              </FormControl>
+              {/* Hàng 2: Mô tả - full width */}
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  label="Mô tả (tùy chọn)"
+                  fullWidth
+                  multiline
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  disabled={isSaving}
+                />
+              </Grid>
             </Grid>
-          </Grid>
+          </Box>
 
-          {/* Buttons */}
-          <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+          <Box sx={{ display: 'flex', gap: 2 }}>
             <Button
               type="submit"
               variant="contained"
               disabled={isSaving}
               startIcon={isSaving ? <CircularProgress size={20} color="inherit" /> : null}
             >
-              {isSaving ? 'Đang lưu...' : (isEditMode ? 'Lưu thay đổi' : 'Tạo chủ đề')}
+              {isSaving ? 'Đang lưu...' : isEditMode ? 'Lưu thay đổi' : 'Tạo chủ đề'}
             </Button>
             <Button
               type="button"

@@ -120,7 +120,7 @@ const ProfilePage: React.FC = () => {
       
       <Grid container spacing={3}>
         {/* Cột Avatar */}
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <Badge
               overlap="circular"
@@ -163,7 +163,7 @@ const ProfilePage: React.FC = () => {
         </Grid>
         
         {/* Cột Thông tin & Mật khẩu */}
-        <Grid item xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           {/* Form Cập nhật Tên */}
           <Paper sx={{ p: 3, mb: 3 }}>
             <Typography component="h2" variant="h6" gutterBottom>

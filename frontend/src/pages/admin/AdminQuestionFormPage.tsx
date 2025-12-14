@@ -203,7 +203,7 @@ const AdminQuestionFormPage: React.FC = () => {
           {/* Grid Container cho các trường select */}
           <Grid container spacing={2}>
             {/* Category */}
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <FormControl fullWidth required disabled={isSaving}>
                 <InputLabel id="category-select-label">Chủ đề</InputLabel>
                 <Select labelId="category-select-label" id="category-select" value={categoryId} label="Chủ đề" onChange={handleCategoryChange}>
@@ -212,7 +212,7 @@ const AdminQuestionFormPage: React.FC = () => {
               </FormControl>
             </Grid>
             {/* Skill Focus */}
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <FormControl fullWidth required disabled={isSaving}>
                 <InputLabel id="skill-select-label">Kỹ năng</InputLabel>
                 <Select labelId="skill-select-label" id="skill-select" value={skillFocus} label="Kỹ năng" onChange={handleSkillFocusChange}>
@@ -224,7 +224,7 @@ const AdminQuestionFormPage: React.FC = () => {
               </FormControl>
             </Grid>
             {/* Question Type */}
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <FormControl fullWidth required disabled={isSaving}>
                 <InputLabel id="type-select-label">Loại câu hỏi</InputLabel>
                 <Select labelId="type-select-label" id="type-select" value={questionType} label="Loại câu hỏi" onChange={handleQuestionTypeChange}>

@@ -86,12 +86,12 @@ const LoginPage: React.FC = () => {
 
           {/* Cập nhật Grid container cho 2 link */}
           <Grid container sx={{ mt: 2 }}>
-            <Grid item xs>
+            <Grid size="grow">
               <Link component={RouterLink} to="/forgot-password" variant="body2">
                 Quên mật khẩu?
               </Link>
             </Grid>
-            <Grid item xs>
+            <Grid size="grow">
               Chưa có tài khoản?
               <Link component={RouterLink} to="/register" variant="body2">
                 {"Đăng ký"}

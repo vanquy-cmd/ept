@@ -140,26 +140,26 @@ const AdminDashboardPage: React.FC = () => {
 
       {/* Grid chứa các thẻ thống kê */}
       <Grid container spacing={3}>
-        <Grid item xs={12} sm={6} md={4} lg={2.4}>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
           <StatCard title="Tổng số Người dùng" value={statCards.totalUsers} icon={<PeopleIcon />} color="#1976d2" />
         </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={2.4}>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
           <StatCard title="Tổng số Bài học" value={statCards.totalLessons} icon={<SchoolIcon />} color="#388e3c" />
         </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={2.4}>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
           <StatCard title="Tổng số Câu hỏi" value={statCards.totalQuestions} icon={<QuestionAnswerIcon />} color="#f57c00" />
         </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={2.4}>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
           <StatCard title="Tổng số Đề thi" value={statCards.totalQuizzes} icon={<QuizIcon />} color="#d32f2f" />
         </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={2.4}>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2.4 }}>
           <StatCard title="Tổng lượt làm bài" value={statCards.totalAttempts} icon={<PlayCircleFilledIcon />} color="#7b1fa2" />
         </Grid>
       </Grid>
       
       {/* Grid chứa Biểu đồ */}
       <Grid container spacing={3}>
-         <Grid item xs={12} lg={8}>
+         <Grid size={{ xs: 12, lg: 8 }}>
             {charts.userGrowth.length > 0 ? (
                 <UserGrowthChart data={charts.userGrowth} />
             ) : (
@@ -168,7 +168,7 @@ const AdminDashboardPage: React.FC = () => {
                 </Paper>
             )}
          </Grid>
-         <Grid item xs={12} lg={4}>
+         <Grid size={{ xs: 12, lg: 4 }}>
             {/* Bạn có thể thêm biểu đồ tròn (Pie Chart) ở đây, ví dụ: Phân bố Quiz theo chủ đề */}
          </Grid>
       </Grid>

@@ -42,8 +42,8 @@ const DictionaryChatbox: React.FC = () => {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
-  const [fromLanguage, setFromLanguage] = useState<'vi' | 'en'>('vi');
-  const [toLanguage, setToLanguage] = useState<'vi' | 'en'>('en');
+  const [fromLanguage] = useState<'vi' | 'en'>('vi');
+  const [toLanguage] = useState<'vi' | 'en'>('en');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TranslationResult | null>(null);
@@ -124,7 +124,6 @@ const DictionaryChatbox: React.FC = () => {
       const translationResult = response.data;
       setResult(translationResult);
       setCurrentWord(input.trim());
-      const searchText = input.trim();
       setInput(''); // Clear input sau khi tra thành công
       
       // Reload lịch sử để hiển thị kết quả mới nhất
@@ -156,13 +155,7 @@ const DictionaryChatbox: React.FC = () => {
     window.open(searchUrl, '_blank');
   };
 
-  const handleSuggestionClick = (suggestion: string) => {
-    setInput(suggestion);
-    // Tự động tra khi click suggestion
-    setTimeout(() => {
-      handleTranslate();
-    }, 100);
-  };
+  // Removed unused handleSuggestionClick function
 
   // Hàm để highlight từ đã dịch trong câu ví dụ
   const highlightTranslatedWord = (sentence: string, translatedWord: string) => {
@@ -171,7 +164,6 @@ const DictionaryChatbox: React.FC = () => {
     // Tìm và thay thế từ đã dịch bằng version in đậm
     // Sử dụng regex để tìm từ (case-insensitive, word boundary)
     const regex = new RegExp(`\\b${translatedWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-    const parts = sentence.split(regex);
     const matches = sentence.match(regex);
     
     if (!matches || matches.length === 0) {

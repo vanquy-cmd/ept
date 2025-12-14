@@ -15,7 +15,6 @@ interface SpeakingTranscriptDisplayProps {
 }
 
 const SpeakingTranscriptDisplay: React.FC<SpeakingTranscriptDisplayProps> = ({
-  transcript,
   tokenMatches,
   targetSentence,
   audioUrl

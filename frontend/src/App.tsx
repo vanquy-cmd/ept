@@ -111,8 +111,8 @@ function App() {
         <Route path="*" element={<NotFoundPage />} />
         </Routes>
       
-      {/* Dictionary Chatbox - Hiển thị ở mọi trang */}
-      <DictionaryChatbox />
+      {/* Dictionary Chatbox - Ẩn trên trang admin */}
+      {!location.pathname.startsWith('/admin') && <DictionaryChatbox />}
     </>
   );
 }
