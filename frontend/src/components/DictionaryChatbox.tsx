@@ -18,7 +18,6 @@ import TranslateIcon from '@mui/icons-material/Translate';
 import SendIcon from '@mui/icons-material/Send';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import DeleteIcon from '@mui/icons-material/Delete';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
 interface TranslationResult {
@@ -178,11 +177,6 @@ const DictionaryChatbox: React.FC = () => {
       e.preventDefault();
       handleTranslate();
     }
-  };
-
-  const handleGoogleSearch = (text: string) => {
-    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(text)}`;
-    window.open(searchUrl, '_blank');
   };
 
   // Removed unused handleSuggestionClick function

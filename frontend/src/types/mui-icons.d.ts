@@ -32,3 +32,5 @@ declare module '@mui/icons-material/LibraryBooks';
 declare module '@mui/icons-material/VolumeUp';
 declare module '@mui/icons-material/Search';
 declare module '@mui/icons-material/SwapHoriz';
+declare module '@mui/icons-material/Send';
+declare module '@mui/icons-material/DeleteOutline';
