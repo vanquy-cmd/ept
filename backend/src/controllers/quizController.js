@@ -66,7 +66,28 @@ export const handleSubmitQuiz = asyncHandler(async (req, res) => {
   try {
     // 1. Bắt đầu Transaction
     console.log("\n[Transaction] Starting...");
-    connection = await pool.getConnection();
+    console.log("[Transaction] Pool status before getConnection:", {
+      totalConnections: pool.pool?._allConnections?.length || 'N/A',
+      freeConnections: pool.pool?._freeConnections?.length || 'N/A',
+      queueLength: pool.pool?._connectionQueue?.length || 'N/A'
+    });
+    
+    const connectionStartTime = Date.now();
+    try {
+      connection = await Promise.race([
+        pool.getConnection(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('getConnection timeout after 20 seconds')), 20000)
+        )
+      ]);
+    } catch (connError) {
+      console.error("[Transaction] ✗ Failed to get connection:", connError.message);
+      throw new Error(`Không thể lấy kết nối database: ${connError.message}`);
+    }
+    const connectionDuration = Date.now() - connectionStartTime;
+    console.log(`[Transaction] ✓ Got connection in ${connectionDuration}ms`);
+    console.log(`[Transaction] Connection ID: ${connection.threadId || 'N/A'}`);
+    
     await connection.beginTransaction();
     console.log("[Transaction] ✓ Started");
 
@@ -76,9 +97,17 @@ export const handleSubmitQuiz = asyncHandler(async (req, res) => {
     console.log(`[Attempt] ✓ Created ID: ${attemptId}`);
 
     // 3. Lấy dữ liệu chấm điểm (gồm prompt, đáp án,...)
+    // TÁCH RA: Query đọc không cần transaction, tránh lock conflict
     console.log("\n[Grading Data] Fetching...");
-    const questionsForGrading = await getGradingDataForQuiz(quizId);
-    console.log(`[Grading Data] ✓ Fetched ${questionsForGrading.length} questions`);
+    console.log(`[Grading Data] Connection ID: ${connection.threadId || 'N/A'}`);
+    console.log(`[Grading Data] Connection state: ${connection.state || 'unknown'}`);
+    const gradingStartTime = Date.now();
+    
+    // Sử dụng pool.query thay vì connection.query để tránh lock trong transaction
+    // Query đọc không cần transaction, chỉ cần transaction cho INSERT/UPDATE
+    const questionsForGrading = await getGradingDataForQuiz(quizId, null);
+    const gradingDuration = Date.now() - gradingStartTime;
+    console.log(`[Grading Data] ✓ Fetched ${questionsForGrading.length} questions in ${gradingDuration}ms`);
     
     const questionsMap = new Map(
       questionsForGrading.map(q => [q.question_id, q])

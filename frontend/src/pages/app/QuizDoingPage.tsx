@@ -115,14 +115,24 @@ const QuizDoingPage: React.FC = () => {
         answers: answersArray 
       });
       
+      console.log("Submit response:", response.data);
+      
+      // Validate response
+      if (!response.data || !response.data.attemptId) {
+        throw new Error('Phản hồi từ server không hợp lệ: thiếu attemptId');
+      }
+      
       const { attemptId } = response.data;
+      
+      // Reset submitting state trước khi navigate
+      setIsSubmitting(false);
       
       // Chuyển hướng đến trang kết quả
       navigate(`/practice/attempt/${attemptId}/results`, { replace: true });
 
     } catch (err: any) {
       console.error("Lỗi khi nộp bài:", err);
-      setError(err.response?.data?.message || 'Không thể nộp bài.');
+      setError(err.response?.data?.message || err.message || 'Không thể nộp bài.');
       setIsSubmitting(false); // Cho phép thử lại nếu lỗi
     }
   }, [id, isSubmitting, navigate]);

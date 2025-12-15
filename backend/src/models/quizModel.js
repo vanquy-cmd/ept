@@ -102,27 +102,91 @@ export const getQuizDetailsById = async (quizId) => {
  * Lấy dữ liệu cần thiết để chấm điểm cho một quiz
  * (Bao gồm câu hỏi AI và câu hỏi tự động)
  * (Thay thế cho hàm getAnswersForGrading cũ)
+ * @param {number} quizId - ID của quiz
+ * @param {object} connection - Connection từ pool (optional, nếu có transaction)
  */
-export const getGradingDataForQuiz = async (quizId) => {
+export const getGradingDataForQuiz = async (quizId, connection = null) => {
+  const logId = `[getGradingData-${Date.now()}]`;
   try {
+    console.log(`${logId} Starting query for quizId: ${quizId}`);
+    console.log(`${logId} Using connection: ${connection ? 'transaction' : 'pool'}`);
+    console.log(`${logId} Connection state: ${connection ? (connection.state || 'unknown') : 'N/A'}`);
+    
+    // Log pool status if using pool
+    if (!connection) {
+      console.log(`${logId} Pool status:`, {
+        totalConnections: pool.pool?._allConnections?.length || 'N/A',
+        freeConnections: pool.pool?._freeConnections?.length || 'N/A',
+        queueLength: pool.pool?._connectionQueue?.length || 'N/A'
+      });
+    }
+    
+    // Tối ưu query: sử dụng LEFT JOIN thay vì correlated subquery để tăng performance
     const query = `
       SELECT
           q.id AS question_id,
           q.question_type,
           q.question_text, -- Cần cho AI prompt
           q.correct_answer, -- Dùng cho fill_blank
-          (SELECT o.id FROM question_options o WHERE o.question_id = q.id AND o.is_correct = 1 LIMIT 1) AS correct_option_id
+          MIN(o.id) AS correct_option_id
       FROM
           questions q
       JOIN
           quiz_questions qq ON q.id = qq.question_id
+      LEFT JOIN
+          question_options o ON o.question_id = q.id AND o.is_correct = 1
       WHERE
-          qq.quiz_id = ?;
+          qq.quiz_id = ?
+      GROUP BY
+          q.id, q.question_type, q.question_text, q.correct_answer;
     `;
-    const [rows] = await pool.query(query, [quizId]);
-    return rows;
+    
+    console.log(`${logId} Executing query...`);
+    const startTime = Date.now();
+    
+    // Wrap query với timeout và cleanup
+    let timeoutId;
+    const queryPromise = connection 
+      ? connection.query(query, [quizId])
+      : pool.query(query, [quizId]);
+    
+    // Thêm timeout 30 giây với cleanup
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error(`Query timeout after 30 seconds for quizId: ${quizId}`));
+      }, 30000);
+    });
+    
+    try {
+      const [rows] = await Promise.race([queryPromise, timeoutPromise]);
+      // Clear timeout nếu query hoàn thành trước
+      if (timeoutId) clearTimeout(timeoutId);
+      const duration = Date.now() - startTime;
+    
+      console.log(`${logId} ✓ Query completed in ${duration}ms`);
+      console.log(`${logId} Returned ${rows.length} rows`);
+      
+      if (rows.length > 0) {
+        console.log(`${logId} Sample question IDs:`, rows.slice(0, 3).map(r => r.question_id));
+      }
+      
+      return rows;
+    } catch (raceError) {
+      // Clear timeout nếu có lỗi
+      if (timeoutId) clearTimeout(timeoutId);
+      throw raceError;
+    }
   } catch (error) {
-    console.error('Lỗi khi lấy dữ liệu chấm điểm model:', error);
+    const duration = error.message?.includes('timeout') ? 30000 : (Date.now() - Date.now()); // Approximate
+    console.error(`${logId} ✗ Query failed after ~${duration}ms`);
+    console.error(`${logId} Error type:`, error.constructor.name);
+    console.error(`${logId} Error message:`, error.message);
+    console.error(`${logId} Error code:`, error.code);
+    console.error(`${logId} Error errno:`, error.errno);
+    console.error(`${logId} Error sqlState:`, error.sqlState);
+    if (error.stack) {
+      console.error(`${logId} Stack trace:`, error.stack.split('\n').slice(0, 5).join('\n'));
+    }
     throw error;
   }
 };

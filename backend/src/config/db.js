@@ -26,11 +26,11 @@ const parseDatabaseUrl = (url) => {
       charset: 'utf8mb4',
       // Cấu hình cho serverless
       connectTimeout: 10000, // 10 giây
-      acquireTimeout: 10000, // 10 giây
-      timeout: 10000, // 10 giây
+      acquireTimeout: 30000, // 30 giây - tăng timeout để chờ connection
+      timeout: 30000, // 30 giây - tăng query timeout
       // Connection pool settings cho serverless
-      connectionLimit: 1, // Giảm số connection cho serverless
-      queueLimit: 0,
+      connectionLimit: 5, // Tăng số connection để tránh blocking
+      queueLimit: 10, // Cho phép queue requests
       enableKeepAlive: true,
       keepAliveInitialDelay: 0,
       // SSL nếu cần (uncomment nếu database yêu cầu SSL)
@@ -50,10 +50,10 @@ const parseDatabaseUrl = (url) => {
         database: match[5],
         charset: 'utf8mb4',
         connectTimeout: 10000,
-        acquireTimeout: 10000,
-        timeout: 10000,
-        connectionLimit: 1,
-        queueLimit: 0,
+        acquireTimeout: 30000,
+        timeout: 30000,
+        connectionLimit: 5,
+        queueLimit: 10,
         enableKeepAlive: true,
         keepAliveInitialDelay: 0,
       };
