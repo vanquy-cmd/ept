@@ -52,7 +52,7 @@ const parseDatabaseUrl = (url) => {
         connectTimeout: 10000,
         acquireTimeout: 30000,
         timeout: 30000,
-        connectionLimit: 5,
+        connectionLimit: 1,
         queueLimit: 10,
         enableKeepAlive: true,
         keepAliveInitialDelay: 0,
