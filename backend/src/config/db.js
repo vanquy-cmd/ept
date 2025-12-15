@@ -29,7 +29,7 @@ const parseDatabaseUrl = (url) => {
       acquireTimeout: 30000, // 30 giây - tăng timeout để chờ connection
       timeout: 30000, // 30 giây - tăng query timeout
       // Connection pool settings cho serverless
-      connectionLimit: 5, // Tăng số connection để tránh blocking
+      connectionLimit: 1, // Tăng số connection để tránh blocking
       queueLimit: 10, // Cho phép queue requests
       enableKeepAlive: true,
       keepAliveInitialDelay: 0,
