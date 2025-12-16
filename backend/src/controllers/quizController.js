@@ -103,9 +103,9 @@ export const handleSubmitQuiz = asyncHandler(async (req, res) => {
     console.log(`[Grading Data] Connection state: ${connection.state || 'unknown'}`);
     const gradingStartTime = Date.now();
     
-    // Sử dụng pool.query thay vì connection.query để tránh lock trong transaction
-    // Query đọc không cần transaction, chỉ cần transaction cho INSERT/UPDATE
-    const questionsForGrading = await getGradingDataForQuiz(quizId, null);
+    // Dùng cùng connection trong transaction để tránh chờ kết nối pool
+    // vì pool có thể bị giới hạn connection khiến query bị treo
+    const questionsForGrading = await getGradingDataForQuiz(quizId, connection);
     const gradingDuration = Date.now() - gradingStartTime;
     console.log(`[Grading Data] ✓ Fetched ${questionsForGrading.length} questions in ${gradingDuration}ms`);
     
@@ -240,8 +240,8 @@ export const handleSubmitQuiz = asyncHandler(async (req, res) => {
         r.user_answer_text,
         r.user_answer_url,
         r.is_correct,
-        r.ai_feedback, // <-- Bây giờ giá trị này đã được AI cập nhật
-        r.ai_score     // <-- Bây giờ giá trị này đã được AI cập nhật
+        r.ai_feedback, 
+        r.ai_score     
       ]);
 
     // 7. Lưu tất cả câu trả lời vào DB (với dữ liệu AI chính xác)

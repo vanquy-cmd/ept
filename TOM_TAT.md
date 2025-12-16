@@ -6,3 +6,4 @@ Hệ thống được xây dựng với kiến trúc web hiện đại, sử d�
 
 Các tính năng chính của hệ thống bao gồm: làm bài tập Writing và Speaking với khả năng chấm điểm tự động bằng AI, học từ vựng theo hệ thống, làm quiz và luyện tập, theo dõi lịch sử học tập, và hệ thống quản trị với dashboard quản lý người dùng, nội dung học tập. Ứng dụng không chỉ hỗ trợ sinh viên trong quá trình tự học mà còn cung cấp phản hồi chi tiết và gợi ý cải thiện, giúp nâng cao hiệu quả học tập và chuẩn bị tốt hơn cho kỳ thi EPT.
 
+

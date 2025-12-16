@@ -112,7 +112,7 @@ export const getGradingDataForQuiz = async (quizId, connection = null) => {
     console.log(`${logId} Using connection: ${connection ? 'transaction' : 'pool'}`);
     console.log(`${logId} Connection state: ${connection ? (connection.state || 'unknown') : 'N/A'}`);
     
-    // Log pool status if using pool
+    // Log pool status if using pool (phục vụ debug hiệu năng, vẫn hữu ích)
     if (!connection) {
       console.log(`${logId} Pool status:`, {
         totalConnections: pool.pool?._allConnections?.length || 'N/A',
@@ -143,42 +143,23 @@ export const getGradingDataForQuiz = async (quizId, connection = null) => {
     
     console.log(`${logId} Executing query...`);
     const startTime = Date.now();
+
+    // Thực hiện query trực tiếp, không bọc thêm timeout nhân tạo
+    const [rows] = connection 
+      ? await connection.query(query, [quizId])
+      : await pool.query(query, [quizId]);
+
+    const duration = Date.now() - startTime;
+    console.log(`${logId} ✓ Query completed in ${duration}ms`);
+    console.log(`${logId} Returned ${rows.length} rows`);
     
-    // Wrap query với timeout và cleanup
-    let timeoutId;
-    const queryPromise = connection 
-      ? connection.query(query, [quizId])
-      : pool.query(query, [quizId]);
-    
-    // Thêm timeout 30 giây với cleanup
-    const timeoutPromise = new Promise((_, reject) => {
-      timeoutId = setTimeout(() => {
-        reject(new Error(`Query timeout after 30 seconds for quizId: ${quizId}`));
-      }, 30000);
-    });
-    
-    try {
-      const [rows] = await Promise.race([queryPromise, timeoutPromise]);
-      // Clear timeout nếu query hoàn thành trước
-      if (timeoutId) clearTimeout(timeoutId);
-      const duration = Date.now() - startTime;
-    
-      console.log(`${logId} ✓ Query completed in ${duration}ms`);
-      console.log(`${logId} Returned ${rows.length} rows`);
-      
-      if (rows.length > 0) {
-        console.log(`${logId} Sample question IDs:`, rows.slice(0, 3).map(r => r.question_id));
-      }
-      
-      return rows;
-    } catch (raceError) {
-      // Clear timeout nếu có lỗi
-      if (timeoutId) clearTimeout(timeoutId);
-      throw raceError;
+    if (rows.length > 0) {
+      console.log(`${logId} Sample question IDs:`, rows.slice(0, 3).map(r => r.question_id));
     }
+    
+    return rows;
   } catch (error) {
-    const duration = error.message?.includes('timeout') ? 30000 : (Date.now() - Date.now()); // Approximate
-    console.error(`${logId} ✗ Query failed after ~${duration}ms`);
+    console.error(`${logId} ✗ Query failed`);
     console.error(`${logId} Error type:`, error.constructor.name);
     console.error(`${logId} Error message:`, error.message);
     console.error(`${logId} Error code:`, error.code);
