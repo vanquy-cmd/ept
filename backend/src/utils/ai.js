@@ -571,7 +571,7 @@ export const gradeSpeaking = async (questionPrompt, audioFileKey) => {
     const transcript = await transcribeAudio(audioBuffer, audioFileKey);
     console.log(`      ✓ Transcript (${transcript.length} chars): ${transcript.substring(0, 100)}...`);
 
-    // 2b. Chấm điểm “chặt” hơn: mô hình vectơ + giữ thứ tự, phạt từ thừa/thiếu
+    // 2b. Chấm điểm "chặt" hơn: kiểm tra thứ tự từ CHÍNH XÁC, phạt nặng khi sai thứ tự
     const normalize = (text) =>
       (text || '')
         .toLowerCase()
@@ -585,26 +585,19 @@ export const gradeSpeaking = async (questionPrompt, audioFileKey) => {
     const rawTranscriptWords = (transcript || '').split(/\s+/).filter(Boolean);
     const totalRef = refWords.length || 1; // tránh chia 0
 
-    // Vector space model: TF vectors + cosine similarity
-    const buildTf = (words) => {
-      const tf = new Map();
-      for (const w of words) tf.set(w, (tf.get(w) || 0) + 1);
-      return tf;
-    };
-    const refTf = buildTf(refWords);
-    const transTf = buildTf(transcriptWords);
-    const allTerms = new Set([...refTf.keys(), ...transTf.keys()]);
-    let dot = 0, refNorm = 0, transNorm = 0;
-    for (const term of allTerms) {
-      const a = refTf.get(term) || 0;
-      const b = transTf.get(term) || 0;
-      dot += a * b;
-      refNorm += a * a;
-      transNorm += b * b;
+    // KIỂM TRA THỨ TỰ TỪ CHÍNH XÁC (exact sequence matching)
+    // Đếm số từ đúng thứ tự liên tiếp từ đầu
+    let exactOrderMatches = 0;
+    let refIdx = 0;
+    for (let i = 0; i < transcriptWords.length && refIdx < refWords.length; i++) {
+      if (transcriptWords[i] === refWords[refIdx]) {
+        exactOrderMatches++;
+        refIdx++;
+      }
     }
-    const cosineSim = dot === 0 ? 0 : dot / (Math.sqrt(refNorm) * Math.sqrt(transNorm) || 1);
+    const exactOrderRatio = exactOrderMatches / totalRef; // [0..1]
 
-    // Longest Common Subsequence (LCS) để giữ thứ tự từ
+    // Longest Common Subsequence (LCS) - chỉ dùng để tham khảo
     const lcsLength = (() => {
       const m = refWords.length;
       const n = transcriptWords.length;
@@ -621,7 +614,7 @@ export const gradeSpeaking = async (questionPrompt, audioFileKey) => {
       return dp[m][n];
     })();
 
-    // Vocab coverage (không xét thứ tự) dùng tập giao/đề mẫu
+    // Vocab coverage (không xét thứ tự) - chỉ để tham khảo
     const uniqueRef = new Set(refWords);
     const uniqueTranscript = new Set(transcriptWords);
     let vocabMatches = 0;
@@ -632,44 +625,67 @@ export const gradeSpeaking = async (questionPrompt, audioFileKey) => {
 
     // Phạt từ thừa và thiếu
     const extraWords = Math.max(transcriptWords.length - refWords.length, 0) / totalRef;
-    const missingWords = Math.max(refWords.length - lcsLength, 0) / totalRef;
+    const missingWords = Math.max(refWords.length - exactOrderMatches, 0) / totalRef;
 
-    // Điểm cuối: ưu tiên thứ tự (LCS), kết hợp cosine (mô hình vectơ) + coverage, trừ phạt
-    const orderedRatio = lcsLength / totalRef; // [0..1]
-    const baseScore = 0.5 * orderedRatio + 0.3 * cosineSim + 0.2 * vocabCoverage;
-    const penalty = Math.min(1, 0.5 * extraWords + 0.5 * missingWords);
+    // PHẠT NẶNG KHI THỨ TỰ SAI: Nếu exactOrderRatio < 1.0, phạt thêm
+    const orderPenalty = exactOrderRatio < 1.0 ? (1.0 - exactOrderRatio) * 0.5 : 0; // Phạt tối đa 50% khi thứ tự sai
+
+    // Điểm cuối: ƯU TIÊN THỨ TỰ CHÍNH XÁC (70%), vocab coverage (20%), LCS (10%)
+    // Nếu thứ tự không chính xác, điểm sẽ bị giảm đáng kể
+    const baseScore = 0.7 * exactOrderRatio + 0.2 * vocabCoverage + 0.1 * (lcsLength / totalRef);
+    const penalty = Math.min(1, 0.3 * extraWords + 0.3 * missingWords + orderPenalty);
     const finalRatio = Math.max(0, Math.min(1, baseScore - penalty));
     const finalScore = Math.round(finalRatio * 100);
 
-    // Đánh dấu token theo thứ tự (greedy scan)
-    let refIdx = 0;
+    // Đánh dấu token theo thứ tự chính xác (exact sequence matching)
+    // QUAN TRỌNG: Logic này đảm bảo rằng một từ chỉ được đánh dấu match nếu nó đúng vị trí NGAY LẬP TỨC
+    // Ví dụ: reference = "hello how are you", transcript = "hello how you are"
+    // - "hello" (pos 0) -> match với ref[0]="hello" ✓
+    // - "how" (pos 1) -> match với ref[1]="how" ✓
+    // - "you" (pos 2) -> KHÔNG match với ref[2]="are" ✗ (refIdxForTokens vẫn = 2)
+    // - "are" (pos 3) -> match với ref[2]="are" ✓ (nhưng đã quá muộn, vì "you" đã xuất hiện trước)
+    // 
+    // Tuy nhiên, logic này vẫn cho phép "are" match vì nó đúng với ref[2]. 
+    // Để nghiêm ngặt hơn, ta cần đảm bảo rằng nếu một từ xuất hiện sai thứ tự,
+    // thì tất cả các từ sau đó cũng không được match nữa.
+    let refIdxForTokens = 0;
+    let hasSkippedWord = false; // Đánh dấu xem đã có từ nào bị skip chưa
+    
     const tokenMatches = rawTranscriptWords.map((rawWord) => {
       const normWord = normalize(rawWord)[0];
       if (!normWord) return { word: rawWord, match: false };
-      while (refIdx < refWords.length && refWords[refIdx] !== normWord) {
-        refIdx++;
+      
+      // Nếu đã có từ bị skip (xuất hiện sai thứ tự), thì tất cả các từ sau đó đều không match
+      if (hasSkippedWord) {
+        return { word: rawWord, match: false };
       }
-      if (refIdx < refWords.length && refWords[refIdx] === normWord) {
-        refIdx++;
+      
+      // Chỉ đánh dấu match nếu từ đúng vị trí trong thứ tự chính xác
+      if (refIdxForTokens < refWords.length && refWords[refIdxForTokens] === normWord) {
+        refIdxForTokens++;
         return { word: rawWord, match: true };
       }
+      
+      // Từ này không match với từ hiện tại trong reference
+      // Đánh dấu đã có từ bị skip - tất cả các từ sau đó sẽ không match
+      hasSkippedWord = true;
       return { word: rawWord, match: false };
     });
 
     console.log(
-      `      ✓ Scoring: LCS ${lcsLength}/${totalRef}, vocab ${vocabMatches}/${uniqueRef.size}, penalty extra=${extraWords.toFixed(2)} missing=${missingWords.toFixed(2)} -> score ${finalScore}/100`
+      `      ✓ Scoring: Exact order ${exactOrderMatches}/${totalRef} (${(exactOrderRatio * 100).toFixed(1)}%), LCS ${lcsLength}/${totalRef}, vocab ${vocabMatches}/${uniqueRef.size}, order penalty=${(orderPenalty * 100).toFixed(1)}%, extra=${(extraWords * 100).toFixed(1)}% missing=${(missingWords * 100).toFixed(1)}% -> score ${finalScore}/100`
     );
 
     const feedbackParts = [
       `Transcript (AI chuyển từ audio):`,
       `"${transcript}"`,
       ``,
-      `Vector scoring (giữ thứ tự + phạt từ thừa/thiếu):`,
+      `Scoring (kiểm tra thứ tự từ CHÍNH XÁC):`,
       `- Tổng số từ trong đề mẫu: ${totalRef}`,
-      `- Độ phủ theo thứ tự (LCS): ${lcsLength}/${totalRef} -> ${(orderedRatio * 100).toFixed(1)}%`,
-      `- Cosine similarity (TF vector): ${(cosineSim * 100).toFixed(1)}%`,
+      `- Thứ tự chính xác (exact sequence): ${exactOrderMatches}/${totalRef} -> ${(exactOrderRatio * 100).toFixed(1)}%`,
       `- Độ phủ từ vựng (không xét thứ tự): ${(vocabCoverage * 100).toFixed(1)}%`,
-      `- Phạt từ thừa: ${(extraWords * 100).toFixed(1)}% | Phạt thiếu: ${(missingWords * 100).toFixed(1)}%`,
+      `- LCS (tham khảo): ${lcsLength}/${totalRef} -> ${((lcsLength / totalRef) * 100).toFixed(1)}%`,
+      `- Phạt thứ tự sai: ${(orderPenalty * 100).toFixed(1)}% | Phạt từ thừa: ${(extraWords * 100).toFixed(1)}% | Phạt thiếu: ${(missingWords * 100).toFixed(1)}%`,
       `- Điểm cuối (0-100): ${finalScore}`
     ];
 
